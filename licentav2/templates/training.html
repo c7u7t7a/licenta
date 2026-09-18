@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Antrenare Model — Rover</title>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d0d0f; --surface: #16181d; --card: #1c1f27;
+    --border: #2a2d38; --accent: #4f8ef7; --green: #2dce89;
+    --red: #f75d5d; --yellow: #f7c948; --text: #e0e4f0; --muted: #6b7299;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--yellow); }
+  .back-btn {
+    padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); cursor: pointer; font-size: 12px;
+    text-decoration: none;
+  }
+  .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .main { display: grid; grid-template-columns: 340px 1fr; gap: 14px; padding: 14px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 14px;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 14px;
+  }
+
+  /* ── Form ── */
+  .form-group { margin-bottom: 14px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  input[type=number], select {
+    width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 13px;
+  }
+  input[type=number]:focus, select:focus { outline: none; border-color: var(--accent); }
+
+  .sess-checkboxes { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+  .sess-check {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    background: var(--surface); border-radius: 8px; border: 1px solid var(--border);
+    cursor: pointer; transition: border-color .15s;
+  }
+  .sess-check:hover { border-color: var(--accent); }
+  .sess-check input { accent-color: var(--accent); }
+  .sess-info { display: flex; flex-direction: column; }
+  .sess-info .sname { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .sess-info .smeta { font-size: 10px; color: var(--muted); }
+
+  .train-btn {
+    width: 100%; padding: 12px; border-radius: 10px; border: none;
+    background: var(--yellow); color: #0d0d0f; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: opacity .15s;
+  }
+  .train-btn:hover { opacity: .85; }
+  .train-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── Progress ── */
+  .progress-bar-wrap {
+    background: var(--surface); border-radius: 8px; overflow: hidden;
+    height: 18px; margin-bottom: 10px;
+  }
+  #progressBar {
+    height: 100%; background: linear-gradient(90deg, var(--yellow), var(--accent));
+    width: 0%; transition: width .4s; border-radius: 8px;
+  }
+  #progressLabel { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+
+  .epoch-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .epoch-box { background: var(--surface); border-radius: 8px; padding: 10px; text-align: center; }
+  .epoch-val { font-size: 20px; font-weight: 700; }
+  .epoch-lbl { font-size: 10px; color: var(--muted); }
+  #epochVal   { color: var(--accent); }
+  #lossVal    { color: var(--yellow); }
+  #valLossVal { color: var(--green); }
+
+  .chart-wrap { position: relative; height: 200px; margin-bottom: 14px; }
+
+  /* ── Done state ── */
+  .done-box {
+    display: none; padding: 14px; border-radius: 10px;
+    border: 1px solid var(--green); background: #0d2a1a;
+    text-align: center;
+  }
+  body.light .done-box { background: rgba(21,128,61,0.10); }
+  .done-box.visible { display: block; }
+  .done-box h3 { color: var(--green); margin-bottom: 6px; }
+  .done-box p  { font-size: 12px; color: var(--muted); word-break: break-all; }
+
+  .error-box {
+    display: none; padding: 14px; border-radius: 10px;
+    border: 1px solid var(--red); background: #2a0d0d;
+    text-align: center;
+  }
+  .error-box.visible { display: block; }
+  .error-box h3 { color: var(--red); margin-bottom: 6px; }
+
+  /* ── Models list ── */
+  .model-list { display: flex; flex-direction: column; gap: 6px; }
+  .model-row {
+    background: var(--surface); border-radius: 8px; padding: 10px 14px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .model-name { font-size: 12px; font-weight: 600; color: var(--accent); word-break: break-all; }
+  .use-btn {
+    padding: 5px 12px; border-radius: 6px; border: 1px solid var(--green);
+    color: var(--green); background: transparent; cursor: pointer; font-size: 11px; white-space: nowrap;
+  }
+  .use-btn:hover { background: var(--green); color: #fff; }
+  .no-models { color: var(--muted); font-size: 12px; text-align: center; padding: 10px; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  @media (max-width: 700px) { .main { grid-template-columns: 1fr; } }
+
+    /* -- Light mode (shared cu index, cheia localStorage 'rover-theme') -- */
+    body.light {
+      --bg:          #eceff5;
+      --surface:     #ffffff;
+      --card:        #ffffff;
+      --card-hover:  #f3f6fc;
+      --border:      rgba(15,23,42,0.20);
+      --border-hi:   #1d4ed8;
+      --accent:      #1d4ed8;
+      --accent-dim:  #1e40af;
+      --accent-glow: rgba(29,78,216,0.20);
+      --green:       #15803d;
+      --green-glow:  rgba(21,128,61,0.20);
+      --red:         #dc2626;
+      --red-glow:    rgba(220,38,38,0.20);
+      --yellow:      #b45309;
+      --purple:      #7c3aed;
+      --cyan:        #0e7490;
+      --text:        #000000;
+      --text-dim:    #000000;
+      --muted:       #1e293b;
+    }
+    body { transition: background .25s, color .25s; }
+    .theme-fab {
+      position: fixed; bottom: 18px; right: 18px; z-index: 9999;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1px solid var(--border); background: var(--card);
+      color: var(--text); cursor: pointer; font-size: 18px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.30); transition: all .2s;
+    }
+    .theme-fab:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+</style>
+</head>
+<body>
+  <button class="theme-fab" onclick="toggleTheme()" title="Schimba tema">🌙</button>
+
+
+<header>
+  <h1>&#9889; Antrenare Model Behavioral Cloning</h1>
+  <a class="back-btn" href="/">&#8592; Dashboard</a>
+</header>
+
+<div class="main">
+
+  <!-- ── Left: config form ── -->
+  <div>
+    <div class="card">
+      <div class="card-title">&#9660; Selectează Sesiuni de Antrenare</div>
+      <div class="sess-checkboxes" id="sessList">
+        {% for s in sessions %}
+        <label class="sess-check">
+          <input type="checkbox" name="session" value="{{ s.session }}">
+          <div class="sess-info">
+            <span class="sname">{{ s.session }}</span>
+            <span class="smeta">{{ s.frames }} cadre</span>
+          </div>
+        </label>
+        {% else %}
+        <div style="color:var(--muted);font-size:12px;padding:10px">Nicio sesiune disponibilă. Înregistrează mai întâi date.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">&#9881; Hiperparametri</div>
+      <div class="form-group">
+        <label>Număr epoci</label>
+        <input type="number" id="epochs" value="20" min="1" max="200">
+      </div>
+      <div class="form-group">
+        <label>Learning rate</label>
+        <input type="number" id="lr" value="0.001" min="0.0001" max="0.1" step="0.0001">
+      </div>
+      <div class="form-group">
+        <label>Batch size</label>
+        <input type="number" id="batchSize" value="32" min="8" max="256" step="8">
+      </div>
+      <button class="train-btn" id="trainBtn" onclick="startTraining()">&#9889; Pornește Antrenarea</button>
+    </div>
+
+    <!-- Available models -->
+    <div class="card">
+      <div class="card-title">&#9660; Modele Disponibile</div>
+      <div class="model-list" id="modelList">
+        {% for m in models %}
+        <div class="model-row">
+          <span class="model-name">{{ m }}</span>
+          <button class="use-btn" onclick="activateModel('{{ m }}')">&#9654; Folosește</button>
+        </div>
+        {% else %}
+        <div class="no-models">Niciun model antrenat încă</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right: progress + chart ── -->
+  <div>
+    <div class="card">
+      <div class="card-title">&#9632; Progres Antrenare</div>
+
+      <div class="progress-bar-wrap"><div id="progressBar"></div></div>
+      <div id="progressLabel">Așteptând pornirea antrenării…</div>
+
+      <div class="epoch-grid">
+        <div class="epoch-box"><div class="epoch-val" id="epochVal">—</div><div class="epoch-lbl">Epocă curentă</div></div>
+        <div class="epoch-box"><div class="epoch-val" id="lossVal">—</div><div class="epoch-lbl">Train Loss</div></div>
+        <div class="epoch-box"><div class="epoch-val" id="valLossVal">—</div><div class="epoch-lbl">Val Loss</div></div>
+      </div>
+
+      <div class="chart-wrap"><canvas id="lossChart"></canvas></div>
+
+      <div class="done-box" id="doneBox">
+        <h3>&#10003; Antrenare finalizată!</h3>
+        <p id="doneModel"></p>
+        <p style="margin-top:6px;color:var(--green)">Modelul a fost salvat și poate fi activat din lista de mai jos.</p>
+      </div>
+      <div class="error-box" id="errorBox">
+        <h3>&#10007; Eroare la antrenare</h3>
+        <p id="errorMsg" style="color:var(--muted);font-size:12px"></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">&#9432; Arhitectură Model</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">
+        <div><strong style="color:var(--text)">Input:</strong> imagine 160×80 grayscale (crop jos 60%)</div>
+        <div><strong style="color:var(--text)">Arhitectură:</strong> CNN — Conv(16)→Conv(32)→Conv(64)→Conv(64) + FC(128)→Tanh</div>
+        <div><strong style="color:var(--text)">Output:</strong> viraj ∈ [-1, 1]</div>
+        <div><strong style="color:var(--text)">Loss:</strong> MSE pe coloana <code>turn</code> din CSV</div>
+        <div><strong style="color:var(--text)">Export:</strong> ONNX opset 11 (compatibil Pi 4 + OpenCV DNN)</div>
+        <div><strong style="color:var(--text)">Optimizator:</strong> Adam + CosineAnnealingLR</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- .main -->
+
+<script>
+const socket = io({ transports: ['websocket', 'polling'] });
+
+// ── Loss chart ──────────────────────────────────────────────────────────────
+const lossCtx = document.getElementById('lossChart').getContext('2d');
+const lossChart = new Chart(lossCtx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'Train Loss', data: [], borderColor: '#f7c948', backgroundColor: '#f7c94822',
+        borderWidth: 1.5, pointRadius: 2, fill: true, tension: 0.3 },
+      { label: 'Val Loss',   data: [], borderColor: '#2dce89', backgroundColor: '#2dce8922',
+        borderWidth: 1.5, pointRadius: 2, fill: true, tension: 0.3 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    plugins: { legend: { labels: { color: '#6b7299', font: { size: 10 } } } },
+    scales: {
+      x: { ticks: { color: '#6b7299', font: { size: 9 } }, grid: { color: '#2a2d38' } },
+      y: { min: 0, ticks: { color: '#6b7299', font: { size: 9 } }, grid: { color: '#2a2d38' } }
+    }
+  }
+});
+
+// ── Socket events ────────────────────────────────────────────────────────────
+socket.on('training_progress', d => {
+  if (d.error) {
+    document.getElementById('errorMsg').textContent = d.error;
+    document.getElementById('errorBox').classList.add('visible');
+    document.getElementById('trainBtn').disabled = false;
+    document.getElementById('trainBtn').textContent = '⚡ Pornește Antrenarea';
+    return;
+  }
+  if (d.done) {
+    document.getElementById('progressBar').style.width = '100%';
+    document.getElementById('progressLabel').textContent = 'Antrenare completă!';
+    document.getElementById('doneModel').textContent = d.model || '';
+    document.getElementById('doneBox').classList.add('visible');
+    document.getElementById('trainBtn').disabled = false;
+    document.getElementById('trainBtn').textContent = '⚡ Pornește Antrenarea';
+    refreshModels();
+    return;
+  }
+
+  const pct = d.percent || 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent =
+    `Epocă ${d.epoch} / ${d.total} — ${pct}%`;
+  document.getElementById('epochVal').textContent   = d.epoch;
+  document.getElementById('lossVal').textContent    = d.loss?.toFixed(4) ?? '—';
+  document.getElementById('valLossVal').textContent = d.val_loss?.toFixed(4) ?? '—';
+
+  lossChart.data.labels.push(d.epoch);
+  lossChart.data.datasets[0].data.push(d.loss);
+  lossChart.data.datasets[1].data.push(d.val_loss);
+  lossChart.update('none');
+});
+
+// ── Start training ───────────────────────────────────────────────────────────
+async function startTraining() {
+  const checked = [...document.querySelectorAll('input[name=session]:checked')]
+    .map(el => el.value);
+  if (!checked.length) { alert('Selectează cel puțin o sesiune!'); return; }
+
+  const epochs    = parseInt(document.getElementById('epochs').value);
+  const lr        = parseFloat(document.getElementById('lr').value);
+  const batchSize = parseInt(document.getElementById('batchSize').value);
+
+  document.getElementById('trainBtn').disabled = true;
+  document.getElementById('trainBtn').textContent = '⏳ Se antrenează…';
+  document.getElementById('doneBox').classList.remove('visible');
+  document.getElementById('errorBox').classList.remove('visible');
+  lossChart.data.labels = [];
+  lossChart.data.datasets.forEach(d => d.data = []);
+  lossChart.update('none');
+
+  const resp = await fetch('/train/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessions: checked, epochs, lr, batch_size: batchSize }),
+  });
+  const r = await resp.json();
+  if (!r.ok) {
+    alert('Eroare: ' + (r.error || 'necunoscută'));
+    document.getElementById('trainBtn').disabled = false;
+    document.getElementById('trainBtn').textContent = '⚡ Pornește Antrenarea';
+  }
+}
+
+// ── Activate model on the car ────────────────────────────────────────────────
+function activateModel(name) {
+  socket.emit('toggle_behavioral', { enabled: true, model: name });
+  socket.once('behavioral_status', d => {
+    if (d.ok) {
+      alert(`Model "${name}" activat! Pornește Lane Assist din dashboard pentru a-l folosi.`);
+    } else {
+      alert('Eroare la activare: ' + d.error);
+    }
+  });
+}
+
+// ── Refresh model list ───────────────────────────────────────────────────────
+async function refreshModels() {
+  const resp = await fetch('/models');
+  const models = await resp.json();
+  const el = document.getElementById('modelList');
+  if (!models.length) {
+    el.innerHTML = '<div class="no-models">Niciun model antrenat încă</div>';
+    return;
+  }
+  el.innerHTML = models.map(m =>
+    `<div class="model-row">
+       <span class="model-name">${m}</span>
+       <button class="use-btn" onclick="activateModel('${m}')">▶ Folosește</button>
+     </div>`
+  ).join('');
+}
+</script>
+  <script>
+    (function () {
+      const KEY = 'rover-theme';
+      window.applyTheme = function (t) {
+        const light = t === 'light';
+        document.body.classList.toggle('light', light);
+        const b = document.querySelector('.theme-fab');
+        if (b) b.textContent = light ? '🌞' : '🌙';
+      };
+      window.toggleTheme = function () {
+        const cur = document.body.classList.contains('light') ? 'light' : 'dark';
+        const next = cur === 'light' ? 'dark' : 'light';
+        localStorage.setItem(KEY, next);
+        applyTheme(next);
+      };
+      applyTheme(localStorage.getItem(KEY) || 'dark');
+    })();
+  </script>
+</body>
+</html>

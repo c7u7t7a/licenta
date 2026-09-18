@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dataset Analytics — Rover</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:      #0d0d0f;
+    --surface: #16181d;
+    --card:    #1c1f27;
+    --border:  #2a2d38;
+    --accent:  #4f8ef7;
+    --green:   #2dce89;
+    --red:     #f75d5d;
+    --yellow:  #f7c948;
+    --purple:  #9b59b6;
+    --text:    #e0e4f0;
+    --muted:   #6b7299;
+    --radius:  12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--accent); flex: 1; }
+  .back-btn, .refresh-btn {
+    padding: 6px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); cursor: pointer; font-size: 12px;
+    text-decoration: none; font-weight: 600; transition: all .15s;
+  }
+  .back-btn:hover    { border-color: var(--accent); color: var(--accent); }
+  .refresh-btn       { border-color: var(--green);  color: var(--green); }
+  .refresh-btn:hover { background: var(--green); color: #fff; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 280px 1fr 1fr;
+    gap: 14px; padding: 14px;
+  }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 6px;
+  }
+  .card-title .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* Summary stats */
+  .sum-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sum-box {
+    background: var(--surface); border-radius: 8px; padding: 12px; text-align: center;
+  }
+  .sum-val { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+  .sum-lbl { font-size: 10px; color: var(--muted); }
+
+  /* Balance meter */
+  .balance-wrap { margin-top: 16px; }
+  .balance-title { font-size: 11px; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+  .balance-bar-bg {
+    height: 18px; background: var(--surface); border-radius: 9px; overflow: hidden;
+    position: relative;
+  }
+  .balance-bar-fill {
+    height: 100%; border-radius: 9px; transition: width .5s;
+  }
+  .balance-bar-lbl {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+  }
+
+  /* Histogram charts */
+  .chart-wrap { position: relative; height: 180px; }
+
+  /* Scatter */
+  #scatterCard { grid-column: 1 / -1; }
+  .scatter-wrap { position: relative; height: 260px; }
+
+  /* Table */
+  #tableCard { grid-column: 1 / -1; }
+  .sess-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .sess-table th {
+    background: var(--surface); padding: 8px 12px; text-align: left;
+    color: var(--muted); font-weight: 600; font-size: 11px; letter-spacing: .5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sess-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .sess-table tr:last-child td { border-bottom: none; }
+  .sess-table tr:hover td { background: var(--surface); }
+  .bal-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 700;
+  }
+
+  /* Direction bars */
+  .dir-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 1px; }
+  .dir-left  { background: #4f8ef7; }
+  .dir-str   { background: #2dce89; }
+  .dir-right { background: #f7c948; }
+
+  /* Recommendations */
+  #recsCard { grid-column: 1 / -1; }
+  .rec-list { display: flex; flex-direction: column; gap: 8px; }
+  .rec-item {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
+    border-radius: 8px; font-size: 12px;
+  }
+  .rec-item.warn  { background: rgba(247,201,72,.1);  border: 1px solid rgba(247,201,72,.25); }
+  .rec-item.error { background: rgba(247,93,93,.1);   border: 1px solid rgba(247,93,93,.25);  }
+  .rec-item.ok    { background: rgba(45,206,137,.1);  border: 1px solid rgba(45,206,137,.25); }
+  .rec-icon { font-size: 16px; line-height: 1; flex-shrink: 0; }
+  .rec-msg  { line-height: 1.5; }
+  .rec-msg strong { display: block; margin-bottom: 2px; }
+
+  /* Loading overlay */
+  #loading {
+    position: fixed; inset: 0; background: rgba(13,13,15,.85);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; z-index: 999;
+  }
+  .spinner {
+    width: 40px; height: 40px; border: 3px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { color: var(--muted); font-size: 13px; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* -- Light mode (shared cu index, cheia localStorage 'rover-theme') -- */
+    body.light {
+      --bg:          #eceff5;
+      --surface:     #ffffff;
+      --card:        #ffffff;
+      --card-hover:  #f3f6fc;
+      --border:      rgba(15,23,42,0.20);
+      --border-hi:   #1d4ed8;
+      --accent:      #1d4ed8;
+      --accent-dim:  #1e40af;
+      --accent-glow: rgba(29,78,216,0.20);
+      --green:       #15803d;
+      --green-glow:  rgba(21,128,61,0.20);
+      --red:         #dc2626;
+      --red-glow:    rgba(220,38,38,0.20);
+      --yellow:      #b45309;
+      --purple:      #7c3aed;
+      --cyan:        #0e7490;
+      --text:        #000000;
+      --text-dim:    #000000;
+      --muted:       #1e293b;
+    }
+    body { transition: background .25s, color .25s; }
+    .theme-fab {
+      position: fixed; bottom: 18px; right: 18px; z-index: 9999;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1px solid var(--border); background: var(--card);
+      color: var(--text); cursor: pointer; font-size: 18px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.30); transition: all .2s;
+    }
+    .theme-fab:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+</style>
+</head>
+<body>
+  <button class="theme-fab" onclick="toggleTheme()" title="Schimba tema">🌙</button>
+
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>Se calculează statistici dataset…</p>
+</div>
+
+<header>
+  <h1>&#128202; Dataset Analytics</h1>
+  <a class="back-btn" href="/">&#8592; Dashboard</a>
+  <button class="refresh-btn" onclick="loadData()">&#8635; Actualizează</button>
+</header>
+
+<div class="grid">
+
+  <!-- ── Summary card ── -->
+  <div class="card" id="summaryCard">
+    <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Sumar General</div>
+    <div class="sum-grid">
+      <div class="sum-box">
+        <div class="sum-val" id="sumFrames" style="color:var(--accent)">—</div>
+        <div class="sum-lbl">Total Cadre</div>
+      </div>
+      <div class="sum-box">
+        <div class="sum-val" id="sumSessions" style="color:var(--green)">—</div>
+        <div class="sum-lbl">Sesiuni</div>
+      </div>
+      <div class="sum-box">
+        <div class="sum-val" id="sumMinutes" style="color:var(--yellow)">—</div>
+        <div class="sum-lbl">Minute Date</div>
+      </div>
+      <div class="sum-box">
+        <div class="sum-val" id="sumBalance" style="color:var(--green)">—</div>
+        <div class="sum-lbl">Balance %</div>
+      </div>
+    </div>
+
+    <div class="balance-wrap">
+      <div class="balance-title">ECHILIBRU DATASET (stânga ↔ dreapta)</div>
+      <div class="balance-bar-bg">
+        <div class="balance-bar-fill" id="balanceFill" style="background:var(--green);width:50%"></div>
+        <div class="balance-bar-lbl" id="balanceLbl">—</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px">
+        <span>Dezechilibrat</span><span>Perfect 100%</span>
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="balance-title">DISTRIBUȚIE DIRECȚIE (medie globală)</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:11px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="color:#4f8ef7">◀ Stânga</span>
+          <strong id="leftPct">—</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="color:#2dce89">↑ Drept</span>
+          <strong id="straightPct">—</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="color:#f7c948">▶ Dreapta</span>
+          <strong id="rightPct">—</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Turn histogram ── -->
+  <div class="card">
+    <div class="card-title">
+      <span class="dot" style="background:var(--yellow)"></span>Distribuție Viraj (Turn)
+    </div>
+    <div class="chart-wrap"><canvas id="turnHistChart"></canvas></div>
+    <div style="margin-top:10px;font-size:10px;color:var(--muted);text-align:center">
+      Valori negative = vira stânga &nbsp;·&nbsp; Pozitive = viraj dreapta
+    </div>
+  </div>
+
+  <!-- ── Speed histogram ── -->
+  <div class="card">
+    <div class="card-title">
+      <span class="dot" style="background:var(--accent)"></span>Distribuție Viteză
+    </div>
+    <div class="chart-wrap"><canvas id="speedHistChart"></canvas></div>
+    <div style="margin-top:10px;font-size:10px;color:var(--muted);text-align:center">
+      Valori absolute &nbsp;·&nbsp; 0 = oprită &nbsp;·&nbsp; 1 = viteză maximă
+    </div>
+  </div>
+
+  <!-- ── Scatter plot ── -->
+  <div class="card" id="scatterCard">
+    <div class="card-title">
+      <span class="dot" style="background:var(--purple)"></span>Scatter — Viteză vs Viraj
+      <span style="margin-left:auto;font-size:10px">max 600 puncte eșantionate</span>
+    </div>
+    <div class="scatter-wrap"><canvas id="scatterChart"></canvas></div>
+  </div>
+
+  <!-- ── Per-session table ── -->
+  <div class="card" id="tableCard">
+    <div class="card-title"><span class="dot" style="background:var(--green)"></span>Analiză per Sesiune</div>
+    <div style="overflow-x:auto">
+      <table class="sess-table">
+        <thead>
+          <tr>
+            <th>Sesiune</th>
+            <th>Cadre</th>
+            <th>Durată</th>
+            <th>Avg Viteză</th>
+            <th>Avg Viraj</th>
+            <th>Balance</th>
+            <th>Distribuție Direcție</th>
+          </tr>
+        </thead>
+        <tbody id="sessTableBody">
+          <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Se încarcă…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Recommendations ── -->
+  <div class="card" id="recsCard">
+    <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Recomandări Automate</div>
+    <div class="rec-list" id="recsList">
+      <div style="color:var(--muted);font-size:12px">Se calculează…</div>
+    </div>
+  </div>
+
+</div><!-- .grid -->
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Charts — initialized globally, filled after data load
+// ══════════════════════════════════════════════════════════════════
+const chartDefaults = {
+  responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+  plugins: { legend: { display: false } },
+};
+
+// Turn histogram
+const turnHistCtx = document.getElementById('turnHistChart').getContext('2d');
+const turnHistChart = new Chart(turnHistCtx, {
+  type: 'bar',
+  data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 3 }] },
+  options: {
+    ...chartDefaults,
+    scales: {
+      x: { ticks: { color: '#6b7299', font: { size: 9 } }, grid: { color: '#2a2d38' } },
+      y: { ticks: { color: '#6b7299', font: { size: 9 } }, grid: { color: '#2a2d38' },
+           title: { display: true, text: 'Nr. cadre', color: '#6b7299', font: { size: 10 } } },
+    }
+  }
+});
+
+// Speed histogram
+const speedHistCtx = document.getElementById('speedHistChart').getContext('2d');
+const speedHistChart = new Chart(speedHistCtx, {
+  type: 'bar',
+  data: { labels: [], datasets: [{ data: [], backgroundColor: '#4f8ef755', borderColor: '#4f8ef7', borderWidth: 1, borderRadius: 3 }] },
+  options: {
+    ...chartDefaults,
+    scales: {
+      x: { ticks: { color: '#6b7299', font: { size: 9 } }, grid: { color: '#2a2d38' } },
+      y: { ticks: { color: '#6b7299', font: { size: 9 } }, grid: { color: '#2a2d38' } },
+    }
+  }
+});
+
+// Scatter
+const scatterCtx = document.getElementById('scatterChart').getContext('2d');
+const scatterChart = new Chart(scatterCtx, {
+  type: 'scatter',
+  data: { datasets: [{ data: [], backgroundColor: 'rgba(155,89,182,0.35)', pointRadius: 3, pointHoverRadius: 5 }] },
+  options: {
+    ...chartDefaults,
+    scales: {
+      x: {
+        title: { display: true, text: 'Viteză (|v|)', color: '#6b7299', font: { size: 11 } },
+        ticks: { color: '#6b7299', font: { size: 9 } }, grid: { color: '#2a2d38' },
+        min: 0, max: 1,
+      },
+      y: {
+        title: { display: true, text: 'Viraj (turn)', color: '#6b7299', font: { size: 11 } },
+        ticks: { color: '#6b7299', font: { size: 9 } }, grid: { color: '#2a2d38' },
+        min: -1, max: 1,
+      },
+    }
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// Data loading
+// ══════════════════════════════════════════════════════════════════
+async function loadData() {
+  document.getElementById('loading').style.display = 'flex';
+  try {
+    const resp = await fetch('/analytics/data');
+    const d    = await resp.json();
+    renderAll(d);
+  } catch (e) {
+    alert('Eroare la încărcarea datelor: ' + e);
+  } finally {
+    document.getElementById('loading').style.display = 'none';
+  }
+}
+
+function renderAll(d) {
+  renderSummary(d);
+  renderTurnHist(d.turn_histogram);
+  renderSpeedHist(d.speed_histogram);
+  renderScatter(d.scatter);
+  renderTable(d.sessions);
+  renderRecommendations(d);
+}
+
+// ── Summary ────────────────────────────────────────────────────────────────
+function renderSummary(d) {
+  document.getElementById('sumFrames').textContent   = d.total_frames.toLocaleString('ro-RO');
+  document.getElementById('sumSessions').textContent = d.total_sessions;
+  document.getElementById('sumMinutes').textContent  = (d.total_hours * 60).toFixed(1);
+  document.getElementById('sumBalance').textContent  = d.global_balance + '%';
+
+  // Balance bar color
+  const bal = d.global_balance;
+  const color = bal >= 85 ? '#2dce89' : bal >= 65 ? '#f7c948' : '#f75d5d';
+  document.getElementById('sumBalance').style.color = color;
+  const fill = document.getElementById('balanceFill');
+  fill.style.width      = bal + '%';
+  fill.style.background = color;
+  document.getElementById('balanceLbl').textContent = bal + '%';
+
+  // Compute overall left/straight/right from all sessions
+  if (d.sessions.length > 0) {
+    const totalF = d.total_frames || 1;
+    let lSum = 0, rSum = 0, sSum = 0;
+    d.sessions.forEach(s => {
+      lSum += s.left_pct     * s.frames;
+      rSum += s.right_pct    * s.frames;
+      sSum += s.straight_pct * s.frames;
+    });
+    document.getElementById('leftPct').textContent     = (lSum / totalF).toFixed(1) + '%';
+    document.getElementById('rightPct').textContent    = (rSum / totalF).toFixed(1) + '%';
+    document.getElementById('straightPct').textContent = (sSum / totalF).toFixed(1) + '%';
+  }
+}
+
+// ── Turn histogram ─────────────────────────────────────────────────────────
+function renderTurnHist(hist) {
+  const colors = hist.bins.map(b => {
+    if (b < -0.1) return 'rgba(79,142,247,0.7)';     // left — blue
+    if (b >  0.1) return 'rgba(247,201,72,0.7)';     // right — yellow
+    return 'rgba(45,206,137,0.7)';                    // straight — green
+  });
+  turnHistChart.data.labels   = hist.bins.map(b => b.toFixed(1));
+  turnHistChart.data.datasets[0].data            = hist.counts;
+  turnHistChart.data.datasets[0].backgroundColor = colors;
+  turnHistChart.update();
+}
+
+// ── Speed histogram ────────────────────────────────────────────────────────
+function renderSpeedHist(hist) {
+  speedHistChart.data.labels                     = hist.bins.map(b => b.toFixed(1));
+  speedHistChart.data.datasets[0].data           = hist.counts;
+  speedHistChart.update();
+}
+
+// ── Scatter ────────────────────────────────────────────────────────────────
+function renderScatter(pts) {
+  scatterChart.data.datasets[0].data = pts;
+  scatterChart.update();
+}
+
+// ── Per-session table ──────────────────────────────────────────────────────
+function renderTable(sessions) {
+  const tbody = document.getElementById('sessTableBody');
+  if (!sessions || sessions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Niciun dataset înregistrat</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = sessions.map(s => {
+    const bal   = s.balance;
+    const color = bal >= 85 ? '#2dce89' : bal >= 65 ? '#f7c948' : '#f75d5d';
+    const dur   = s.duration_s < 60
+      ? s.duration_s.toFixed(0) + 's'
+      : (s.duration_s / 60).toFixed(1) + 'min';
+
+    const lw = s.left_pct.toFixed(0);
+    const sw = s.straight_pct.toFixed(0);
+    const rw = s.right_pct.toFixed(0);
+
+    return `<tr>
+      <td style="font-size:11px;color:var(--muted)">${s.session.replace('session_','')}</td>
+      <td>${s.frames.toLocaleString('ro-RO')}</td>
+      <td>${dur}</td>
+      <td>${(s.avg_speed * 100).toFixed(0)}%</td>
+      <td style="color:${Math.abs(s.avg_turn) > 0.3 ? 'var(--yellow)' : 'var(--text)'}">${s.avg_turn >= 0 ? '+' : ''}${s.avg_turn.toFixed(3)}</td>
+      <td><span class="bal-pill" style="background:${color}22;color:${color}">${bal}%</span></td>
+      <td>
+        <div class="dir-bar" title="Stânga ${lw}% / Drept ${sw}% / Dreapta ${rw}%">
+          <div class="dir-left"  style="width:${lw}%"></div>
+          <div class="dir-str"   style="width:${sw}%"></div>
+          <div class="dir-right" style="width:${rw}%"></div>
+        </div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">
+          ◀ ${lw}% &nbsp; ↑ ${sw}% &nbsp; ▶ ${rw}%
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Recommendations ────────────────────────────────────────────────────────
+function renderRecommendations(d) {
+  const recs  = [];
+  const total = d.total_frames;
+  const bal   = d.global_balance;
+  const avgT  = d.global_avg_turn;
+
+  if (total === 0) {
+    recs.push({ type: 'error', icon: '🚨', title: 'Niciun dataset înregistrat',
+      msg: 'Pornește înregistrarea din dashboard și conduce cel puțin 3-5 minute.' });
+  } else {
+    if (total < 300) {
+      recs.push({ type: 'error', icon: '⚠️', title: 'Dataset prea mic',
+        msg: `${total} cadre — pentru behavioral cloning recomandăm minimum 500 cadre (ideal 2000+).` });
+    } else if (total < 1000) {
+      recs.push({ type: 'warn', icon: '📊', title: 'Dataset mediu',
+        msg: `${total} cadre — modelul va funcționa dar cu acuratețe limitată. Înregistrează mai mult.` });
+    } else {
+      recs.push({ type: 'ok', icon: '✅', title: 'Dataset suficient',
+        msg: `${total.toLocaleString('ro-RO')} cadre — suficient pentru antrenare bună.` });
+    }
+
+    if (bal < 60) {
+      const dir = avgT > 0 ? 'dreapta' : 'stânga';
+      const opp = avgT > 0 ? 'stânga'  : 'dreapta';
+      recs.push({ type: 'error', icon: '⚖️', title: `Dataset dezechilibrat (${bal}%)`,
+        msg: `Predomină virajele spre ${dir}. Înregistrează mai multe viraje spre ${opp} pentru a echilibra. Un model dezechilibrat va tinde să vireze spre ${dir}.` });
+    } else if (bal < 80) {
+      recs.push({ type: 'warn', icon: '⚖️', title: `Echilibru moderat (${bal}%)`,
+        msg: 'Dataset ușor dezechilibrat. Dacă modelul BC viraj într-o direcție, înregistrează mai mult în cealaltă.' });
+    } else {
+      recs.push({ type: 'ok', icon: '⚖️', title: `Echilibru bun (${bal}%)`,
+        msg: 'Distribuția stânga/dreapta este echilibrată — modelul de behavioral cloning va fi imparțial.' });
+    }
+
+    // Check per-session balance
+    const badSess = d.sessions.filter(s => s.balance < 55);
+    if (badSess.length > 0) {
+      recs.push({ type: 'warn', icon: '📁', title: `${badSess.length} sesiune(i) dezechilibrate`,
+        msg: 'Sesiunile: ' + badSess.map(s => s.session.replace('session_', '')).join(', ') +
+             ' au distribuție viraje dezechilibrată. Consideră să le excluzi din antrenare.' });
+    }
+
+    // Speed variety check
+    const speedHist  = d.speed_histogram;
+    const stopFrames = speedHist.counts[0] || 0;
+    const stopPct    = total > 0 ? (stopFrames / total * 100) : 0;
+    if (stopPct > 40) {
+      recs.push({ type: 'warn', icon: '🛑', title: `Prea multe cadre cu viteza 0 (${stopPct.toFixed(0)}%)`,
+        msg: 'Modelul BC va învăța că mașina stă mult. Șterge sesiunile în care mașina era oprită sau filtrează din CSV.' });
+    }
+
+    recs.push({ type: 'ok', icon: '💡', title: 'Sfat antrenare',
+      msg: 'Folosește mai multe sesiuni scurte diverse (curbe diferite, viteze diferite) decât o singură sesiune lungă monotonă.' });
+  }
+
+  const list = document.getElementById('recsList');
+  list.innerHTML = recs.map(r => `
+    <div class="rec-item ${r.type}">
+      <span class="rec-icon">${r.icon}</span>
+      <div class="rec-msg">
+        <strong>${r.title}</strong>
+        ${r.msg}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════════════
+loadData();
+</script>
+  <script>
+    (function () {
+      const KEY = 'rover-theme';
+      window.applyTheme = function (t) {
+        const light = t === 'light';
+        document.body.classList.toggle('light', light);
+        const b = document.querySelector('.theme-fab');
+        if (b) b.textContent = light ? '🌞' : '🌙';
+      };
+      window.toggleTheme = function () {
+        const cur = document.body.classList.contains('light') ? 'light' : 'dark';
+        const next = cur === 'light' ? 'dark' : 'light';
+        localStorage.setItem(KEY, next);
+        applyTheme(next);
+      };
+      applyTheme(localStorage.getItem(KEY) || 'dark');
+    })();
+  </script>
+</body>
+</html>

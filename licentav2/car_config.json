@@ -1,0 +1,13 @@
+{
+  "base_speed":     0.52,
+  "base_turn":      1.0,
+  "warp_points":    [0, 55, 0, 240],
+  "pid_kp":         0.6,
+  "pid_ki":         0.01,
+  "pid_kd":         0.25,
+  "pid_enabled":    true,
+  "curve_k":        0.85,
+  "adaptive_speed": true,
+  "roi_top_frac":   0.55,
+  "lane_mode":      "warp"
+}

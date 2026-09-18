@@ -1,0 +1,29 @@
+# ============================================================
+#  requirements_pi.txt — DOAR pentru Raspberry Pi (runtime)
+#  Nu include PyTorch — inferența rulează prin OpenCV DNN.
+#
+#  Instalare:
+#      pip install -r requirements_pi.txt
+# ============================================================
+
+# ── Web server ───────────────────────────────────────────────
+flask>=2.3.0
+flask-socketio>=5.3.6
+
+# ── Computer Vision ──────────────────────────────────────────
+# Pe Pi e recomandat să instalezi opencv prin apt (mai rapid):
+#   sudo apt install -y python3-opencv
+# Dacă preferi pip:
+opencv-python-headless>=4.8.0
+
+numpy>=1.24.0
+
+# ── GPIO / Motoare ───────────────────────────────────────────
+gpiozero>=2.0
+rpi-lgpio>=0.3          # backend RPiGPIOFactory — necesar pentru PWM
+
+# ── Controller PS4/DS4 ───────────────────────────────────────
+pygame>=2.5.0
+
+# ── Monitorizare sistem ──────────────────────────────────────
+psutil>=5.9.0

@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ro">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Config Manager — Rover</title>
+  <style>
+    :root {
+      --bg:          #06080f;
+      --surface:     #0b0e18;
+      --card:        #0f1320;
+      --border:      rgba(255,255,255,0.06);
+      --border-hi:   rgba(91,141,239,0.35);
+      --accent:      #5b8def;
+      --accent-dim:  #3a6fd8;
+      --accent-glow: rgba(91,141,239,0.2);
+      --green:       #00d68f;
+      --red:         #ff4757;
+      --yellow:      #ffa502;
+      --text:        #e2e8ff;
+      --text-dim:    #8892b0;
+      --muted:       #4a5275;
+      --radius:      14px;
+      --radius-sm:   9px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      font-size: 13.5px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      background: rgba(11,14,24,0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .back-btn {
+      padding: 6px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      transition: all .18s;
+    }
+    .back-btn:hover {
+      border-color: var(--border-hi);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .main {
+      max-width: 980px;
+      margin: 22px auto;
+      padding: 0 16px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.45);
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .card:hover { border-color: rgba(255,255,255,0.09); }
+
+    .card-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .card-title .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent-glow);
+    }
+
+    /* ── Preset buttons ── */
+    .preset-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .preset-btn {
+      padding: 8px 18px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      transition: all .18s;
+    }
+
+    .preset-btn:hover {
+      border-color: rgba(91,141,239,0.4);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+    .preset-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+
+    /* ── Param grid ── */
+    .param-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .param-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .param-label {
+      font-size: 11.5px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .param-label strong {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .param-val-badge {
+      background: rgba(91,141,239,0.1);
+      border: 1px solid rgba(91,141,239,0.25);
+      border-radius: 5px;
+      padding: 2px 8px;
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--accent);
+      min-width: 52px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type=range] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+      height: 4px;
+    }
+
+    input[type=number], select {
+      width: 100%;
+      padding: 7px 11px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    input[type=number]:focus, select:focus {
+      border-color: var(--border-hi);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    /* ── Warp points ── */
+    .warp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* ── Action row ── */
+    .action-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      padding: 10px 22px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      transition: all .18s;
+    }
+
+    .btn:hover {
+      border-color: rgba(91,141,239,0.4);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .btn.save {
+      border-color: rgba(0,214,143,0.35);
+      color: var(--green);
+      background: rgba(0,214,143,0.06);
+    }
+
+    .btn.save:hover {
+      background: linear-gradient(135deg, var(--green), #00a86b);
+      border-color: var(--green);
+      color: #fff;
+      box-shadow: 0 0 18px rgba(0,214,143,0.2);
+    }
+
+    /* ── Status toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 22px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--green), #00a86b);
+      color: #fff;
+      display: none;
+      z-index: 999;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,214,143,0.2);
+    }
+
+    #toast.error {
+      background: linear-gradient(135deg, var(--red), #c0392b);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(255,71,87,0.2);
+    }
+    #toast.visible { display: block; animation: slideIn .22s cubic-bezier(.25,.46,.45,.94); }
+
+    @keyframes slideIn {
+      from { transform: translateY(16px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    /* ── Current config summary ── */
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .summary-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .summary-table td:first-child { color: var(--muted); }
+    .summary-table td:last-child  { font-weight: 600; text-align: right; }
+    .summary-table tr:last-child td { border-bottom: none; }
+  
+    /* -- Light mode (shared cu index, cheia localStorage 'rover-theme') -- */
+    body.light {
+      --bg:          #eceff5;
+      --surface:     #ffffff;
+      --card:        #ffffff;
+      --card-hover:  #f3f6fc;
+      --border:      rgba(15,23,42,0.20);
+      --border-hi:   #1d4ed8;
+      --accent:      #1d4ed8;
+      --accent-dim:  #1e40af;
+      --accent-glow: rgba(29,78,216,0.20);
+      --green:       #15803d;
+      --green-glow:  rgba(21,128,61,0.20);
+      --red:         #dc2626;
+      --red-glow:    rgba(220,38,38,0.20);
+      --yellow:      #b45309;
+      --purple:      #7c3aed;
+      --cyan:        #0e7490;
+      --text:        #000000;
+      --text-dim:    #000000;
+      --muted:       #1e293b;
+    }
+    body { transition: background .25s, color .25s; }
+    .theme-fab {
+      position: fixed; bottom: 18px; right: 18px; z-index: 9999;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1px solid var(--border); background: var(--card);
+      color: var(--text); cursor: pointer; font-size: 18px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.30); transition: all .2s;
+    }
+    .theme-fab:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+</style>
+</head>
+
+<body>
+  <button class="theme-fab" onclick="toggleTheme()" title="Schimba tema">🌙</button>
+
+
+  <header>
+    <h1>&#9881; Config Manager</h1>
+    <a href="/" class="back-btn">&#8592; Dashboard</a>
+  </header>
+
+  <div class="main">
+
+    <!-- ── Preset selector ── -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Profiluri Predefinite</div>
+      <div class="preset-row" id="presetRow">
+        {% for p in presets %}
+        <button class="preset-btn" onclick="applyPreset('{{ p }}')">{{ p }}</button>
+        {% endfor %}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">
+        Selectează un profil pentru a pre-completa parametrii, apoi apasă <strong style="color:var(--text)">Salvează &amp; Aplică</strong>.
+      </div>
+    </div>
+
+    <!-- ── Driving parameters ── -->
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--green)"></span>Parametri Conducere</div>
+      <div class="param-grid">
+
+        <div class="param-row">
+          <div class="param-label">
+            <strong>Viteză de bază</strong>
+            <span class="param-val-badge" id="lbl_base_speed">{{ "%.2f"|format(config.base_speed) }}</span>
+          </div>
+          <input type="range" id="sl_base_speed" min="10" max="100" step="1"
+                 value="{{ (config.base_speed * 100)|int }}"
+                 oninput="syncSlider('base_speed', this.value/100, 2)">
+          <div style="font-size:10px;color:var(--muted)">Viteza implicită când pornești lane assist (10–100%)</div>
+        </div>
+
+        <div class="param-row">
+          <div class="param-label">
+            <strong>Coeficient curbă k</strong>
+            <span class="param-val-badge" id="lbl_curve_k">{{ "%.2f"|format(config.curve_k) }}</span>
+          </div>
+          <input type="range" id="sl_curve_k" min="0" max="150" step="1"
+                 value="{{ (config.curve_k * 100)|int }}"
+                 oninput="syncSlider('curve_k', this.value/100, 2)">
+          <div style="font-size:10px;color:var(--muted)">Frânare adaptivă în curbe (0=dezactivat, 1.5=maxim)</div>
+        </div>
+
+        <div class="param-row">
+          <div class="param-label">
+            <strong>ROI — fracție ignorată sus</strong>
+            <span class="param-val-badge" id="lbl_roi_top_frac">{{ "%.2f"|format(config.roi_top_frac) }}</span>
+          </div>
+          <input type="range" id="sl_roi_top_frac" min="20" max="78" step="1"
+                 value="{{ (config.roi_top_frac * 100)|int }}"
+                 oninput="syncSlider('roi_top_frac', this.value/100, 2)">
+          <div style="font-size:10px;color:var(--muted)">Mod Direct (pistă mică): zona ignorată din partea de sus</div>
+        </div>
+
+        <div class="param-row">
+          <div class="param-label">
+            <strong>Mod Lane Detection</strong>
+          </div>
+          <select id="sel_lane_mode" onchange="cfg.lane_mode = this.value">
+            <option value="warp"   {% if config.lane_mode == 'warp'   %}selected{% endif %}>warp — Bird's Eye (pistă mare)</option>
+            <option value="direct" {% if config.lane_mode == 'direct' %}selected{% endif %}>direct — Sliding Window (pistă mică)</option>
+          </select>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── PID Gains ── -->
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>PID Controller</div>
+      <div class="param-grid">
+
+        <div class="param-row">
+          <div class="param-label">
+            <strong>Kp — Proporțional</strong>
+            <span class="param-val-badge" id="lbl_pid_kp">{{ "%.2f"|format(config.pid_kp) }}</span>
+          </div>
+          <input type="range" id="sl_pid_kp" min="0" max="300" step="1"
+                 value="{{ (config.pid_kp * 100)|int }}"
+                 oninput="syncSlider('pid_kp', this.value/100, 2)">
+        </div>
+
+        <div class="param-row">
+          <div class="param-label">
+            <strong>Ki — Integral</strong>
+            <span class="param-val-badge" id="lbl_pid_ki">{{ "%.2f"|format(config.pid_ki) }}</span>
+          </div>
+          <input type="range" id="sl_pid_ki" min="0" max="50" step="1"
+                 value="{{ (config.pid_ki * 100)|int }}"
+                 oninput="syncSlider('pid_ki', this.value/100, 2)">
+        </div>
+
+        <div class="param-row">
+          <div class="param-label">
+            <strong>Kd — Derivativ</strong>
+            <span class="param-val-badge" id="lbl_pid_kd">{{ "%.2f"|format(config.pid_kd) }}</span>
+          </div>
+          <input type="range" id="sl_pid_kd" min="0" max="100" step="1"
+                 value="{{ (config.pid_kd * 100)|int }}"
+                 oninput="syncSlider('pid_kd', this.value/100, 2)">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Warp points ── -->
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Puncte Warp (Bird's Eye)</div>
+      <div class="warp-grid">
+        {% for key, lbl in [('wTop','wTop — lățime sus'), ('hTop','hTop — înălțime sus'),
+                             ('wBot','wBot — lățime jos'), ('hBot','hBot — înălțime jos')] %}
+        <div class="param-row">
+          <div class="param-label">
+            <strong>{{ lbl }}</strong>
+            <span class="param-val-badge" id="lbl_{{ key }}">{{ config.warp_points[loop.index0] }}</span>
+          </div>
+          <input type="range" id="sl_{{ key }}" min="0" max="240" step="1"
+                 value="{{ config.warp_points[loop.index0] }}"
+                 oninput="syncWarp('{{ key }}', this.value)">
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ── Thread rates ── -->
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--red)"></span>Rate Thread-uri (FPS)</div>
+      <div class="param-grid">
+
+        <div class="param-row">
+          <div class="param-label">
+            <strong>Lane FPS</strong>
+            <span class="param-val-badge" id="lbl_lane_fps">{{ config.lane_fps }}</span>
+          </div>
+          <input type="range" id="sl_lane_fps" min="5" max="30" step="1"
+                 value="{{ config.lane_fps }}"
+                 oninput="syncSlider('lane_fps', parseInt(this.value), 0)">
+          <div style="font-size:10px;color:var(--muted)">Frecvența de rulare a algoritmului de lane detection</div>
+        </div>
+
+        <div class="param-row">
+          <div class="param-label">
+            <strong>Sign FPS</strong>
+            <span class="param-val-badge" id="lbl_sign_fps">{{ config.sign_fps }}</span>
+          </div>
+          <input type="range" id="sl_sign_fps" min="1" max="20" step="1"
+                 value="{{ config.sign_fps }}"
+                 oninput="syncSlider('sign_fps', parseInt(this.value), 0)">
+          <div style="font-size:10px;color:var(--muted)">Frecvența detecției de semne (mai mic = mai lent Pi)</div>
+        </div>
+
+        <div class="param-row">
+          <div class="param-label">
+            <strong>Record FPS</strong>
+            <span class="param-val-badge" id="lbl_record_fps">{{ config.record_fps }}</span>
+          </div>
+          <input type="range" id="sl_record_fps" min="2" max="30" step="1"
+                 value="{{ config.record_fps }}"
+                 oninput="syncSlider('record_fps', parseInt(this.value), 0)">
+          <div style="font-size:10px;color:var(--muted)">Cadre salvate pe secundă la înregistrare dataset</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Actions ── -->
+    <div class="card">
+      <div class="action-row">
+        <button class="btn" onclick="reloadFromServer()">&#8635; Reîncarcă de pe server</button>
+        <button class="btn save" onclick="saveConfig()">&#10003; Salvează &amp; Aplică</button>
+      </div>
+    </div>
+
+  </div><!-- .main -->
+
+  <div id="toast"></div>
+
+  <script>
+    // Current config object (edited live)
+    const cfg = {
+      base_speed:   {{ config.base_speed }},
+      base_turn:    {{ config.base_turn }},
+      warp_points:  {{ config.warp_points | tojson }},
+      pid_kp:       {{ config.pid_kp }},
+      pid_ki:       {{ config.pid_ki }},
+      pid_kd:       {{ config.pid_kd }},
+      curve_k:      {{ config.curve_k }},
+      roi_top_frac: {{ config.roi_top_frac }},
+      lane_mode:    '{{ config.lane_mode }}',
+      lane_fps:     {{ config.lane_fps }},
+      sign_fps:     {{ config.sign_fps }},
+      record_fps:   {{ config.record_fps }},
+    };
+
+    // ── Slider sync ────────────────────────────────────────────────────────────
+    function syncSlider(key, val, decimals) {
+      cfg[key] = val;
+      const lbl = document.getElementById('lbl_' + key);
+      if (lbl) lbl.textContent = decimals > 0 ? val.toFixed(decimals) : String(val);
+    }
+
+    function syncWarp(key, val) {
+      val = parseInt(val);
+      const idx = { wTop: 0, hTop: 1, wBot: 2, hBot: 3 }[key];
+      if (idx !== undefined) cfg.warp_points[idx] = val;
+      const lbl = document.getElementById('lbl_' + key);
+      if (lbl) lbl.textContent = val;
+    }
+
+    // ── Preset apply ───────────────────────────────────────────────────────────
+    const presets = {{ (presets) | tojson }};
+
+    function applyPreset(name) {
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.toggle('active', b.textContent.trim() === name);
+      });
+
+      fetch('/config/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preset: name }),
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          applyConfigToUI(d.config);
+          showToast('Profil "' + name + '" aplicat!');
+        } else {
+          showToast(d.error || 'Eroare', true);
+        }
+      })
+      .catch(e => showToast('Eroare rețea: ' + e, true));
+    }
+
+    function applyConfigToUI(c) {
+      Object.assign(cfg, c);
+
+      // Update sliders
+      const sliderMap = {
+        base_speed:   c.base_speed * 100,
+        curve_k:      c.curve_k * 100,
+        roi_top_frac: c.roi_top_frac * 100,
+        pid_kp:       c.pid_kp * 100,
+        pid_ki:       c.pid_ki * 100,
+        pid_kd:       c.pid_kd * 100,
+        lane_fps:     c.lane_fps,
+        sign_fps:     c.sign_fps,
+        record_fps:   c.record_fps,
+        wTop: c.warp_points?.[0],
+        hTop: c.warp_points?.[1],
+        wBot: c.warp_points?.[2],
+        hBot: c.warp_points?.[3],
+      };
+
+      for (const [id, val] of Object.entries(sliderMap)) {
+        const sl = document.getElementById('sl_' + id);
+        if (sl && val !== undefined) sl.value = val;
+      }
+
+      // Update labels
+      const lblMap = {
+        base_speed:   c.base_speed?.toFixed(2),
+        curve_k:      c.curve_k?.toFixed(2),
+        roi_top_frac: c.roi_top_frac?.toFixed(2),
+        pid_kp:       c.pid_kp?.toFixed(2),
+        pid_ki:       c.pid_ki?.toFixed(2),
+        pid_kd:       c.pid_kd?.toFixed(2),
+        lane_fps:     c.lane_fps,
+        sign_fps:     c.sign_fps,
+        record_fps:   c.record_fps,
+        wTop: c.warp_points?.[0],
+        hTop: c.warp_points?.[1],
+        wBot: c.warp_points?.[2],
+        hBot: c.warp_points?.[3],
+      };
+
+      for (const [id, val] of Object.entries(lblMap)) {
+        const lbl = document.getElementById('lbl_' + id);
+        if (lbl && val !== undefined) lbl.textContent = val;
+      }
+
+      // Select box
+      if (c.lane_mode) {
+        const sel = document.getElementById('sel_lane_mode');
+        if (sel) sel.value = c.lane_mode;
+        cfg.lane_mode = c.lane_mode;
+      }
+    }
+
+    // ── Save config ────────────────────────────────────────────────────────────
+    function saveConfig() {
+      // Read select box
+      const selLane = document.getElementById('sel_lane_mode');
+      if (selLane) cfg.lane_mode = selLane.value;
+
+      fetch('/config/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cfg),
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) showToast('Configurație salvată și aplicată!');
+        else showToast(d.error || 'Eroare salvare', true);
+      })
+      .catch(e => showToast('Eroare rețea: ' + e, true));
+    }
+
+    // ── Reload from server ─────────────────────────────────────────────────────
+    function reloadFromServer() {
+      fetch('/config/load')
+        .then(r => r.json())
+        .then(c => { applyConfigToUI(c); showToast('Configurație reîncărcată'); })
+        .catch(e => showToast('Eroare: ' + e, true));
+    }
+
+    // ── Toast ──────────────────────────────────────────────────────────────────
+    let toastTimer = null;
+    function showToast(msg, isError = false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'visible' + (isError ? ' error' : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { t.classList.remove('visible'); }, 3000);
+    }
+  </script>
+  <script>
+    (function () {
+      const KEY = 'rover-theme';
+      window.applyTheme = function (t) {
+        const light = t === 'light';
+        document.body.classList.toggle('light', light);
+        const b = document.querySelector('.theme-fab');
+        if (b) b.textContent = light ? '🌞' : '🌙';
+      };
+      window.toggleTheme = function () {
+        const cur = document.body.classList.contains('light') ? 'light' : 'dark';
+        const next = cur === 'light' ? 'dark' : 'light';
+        localStorage.setItem(KEY, next);
+        applyTheme(next);
+      };
+      applyTheme(localStorage.getItem(KEY) || 'dark');
+    })();
+  </script>
+</body>
+
+</html>

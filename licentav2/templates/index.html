@@ -1,0 +1,3340 @@
+<!DOCTYPE html>
+<html lang="ro">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rover Command Center</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    /* ── Dark mode (default) ── */
+    :root {
+      --bg: #06080f;
+      --surface: #0b0e18;
+      --card: #0f1320;
+      --card-hover: #141828;
+      --border: rgba(255, 255, 255, 0.06);
+      --border-hi: rgba(91, 141, 239, 0.35);
+      --accent: #5b8def;
+      --accent-dim: #3a6fd8;
+      --accent-glow: rgba(91, 141, 239, 0.25);
+      --green: #00d68f;
+      --green-glow: rgba(0, 214, 143, 0.2);
+      --red: #ff4757;
+      --red-glow: rgba(255, 71, 87, 0.25);
+      --yellow: #ffa502;
+      --yellow-glow: rgba(255, 165, 2, 0.2);
+      --purple: #a55eea;
+      --cyan: #00cec9;
+      --text: #e2e8ff;
+      --text-dim: #8892b0;
+      --muted: #4a5275;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+      --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    /* ── Light mode ── */
+    body.light {
+      --bg: #eceff5;
+      --surface: #ffffff;
+      --card: #ffffff;
+      --card-hover: #f3f6fc;
+      --border: rgba(15, 23, 42, 0.20);
+      --border-hi: #1d4ed8;
+      --accent: #1d4ed8;
+      /* albastru viu */
+      --accent-dim: #1e40af;
+      --accent-glow: rgba(29, 78, 216, 0.20);
+      --green: #15803d;
+      /* verde viu */
+      --green-glow: rgba(21, 128, 61, 0.20);
+      --red: #dc2626;
+      /* roșu viu */
+      --red-glow: rgba(220, 38, 38, 0.20);
+      --yellow: #b45309;
+      /* chihlimbar (galben pur e invizibil pe alb) */
+      --yellow-glow: rgba(180, 83, 9, 0.20);
+      --purple: #7c3aed;
+      --cyan: #0e7490;
+      --text: #000000;
+      /* NEGRU */
+      --text-dim: #000000;
+      /* NEGRU */
+      --muted: #1e293b;
+      /* aproape negru — etichete bine vizibile */
+      --shadow: 0 8px 30px rgba(15, 23, 42, 0.14);
+      --shadow-sm: 0 2px 10px rgba(15, 23, 42, 0.10);
+    }
+
+    /* Elemente cu culori hardcodate — override pt light mode */
+    body.light header {
+      background: rgba(238, 241, 248, 0.95);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06), var(--shadow-sm);
+    }
+
+    body.light .card::before {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, transparent 60%);
+    }
+
+    body.light .card:hover {
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    }
+
+    body.light #videoWrap {
+      background: #d8dce8;
+    }
+
+    body.light .vid-badge {
+      background: rgba(255, 255, 255, 0.85);
+      border-color: rgba(0, 0, 0, 0.1);
+      color: var(--text);
+    }
+
+    body.light #modeBadge {
+      color: var(--green);
+    }
+
+    body.light .stat-box {
+      background: var(--bg);
+    }
+
+    body.light #eventLog li,
+    body.light #signList li,
+    body.light .sess-row,
+    body.light .traj-stat,
+    body.light .pid-debug-bar,
+    body.light .conf-bar-wrap,
+    body.light .chart-wrap {
+      background: var(--bg);
+    }
+
+    body.light .btn {
+      background: var(--bg);
+      color: var(--text-dim);
+    }
+
+    body.light .btn:hover {
+      background: rgba(58, 111, 216, 0.08);
+    }
+
+    body.light #joystickZone {
+      background: radial-gradient(circle, var(--bg) 60%, rgba(58, 111, 216, 0.06) 100%);
+    }
+
+    body.light #trajCanvas {
+      background: #dde1ee;
+    }
+
+    body.light #adaptPanel {
+      background: rgba(0, 168, 107, 0.06);
+    }
+
+    body.light #pbPanel {
+      background: rgba(255, 100, 0, 0.04);
+    }
+
+    body.light #mockPanel,
+    body.light #laneDirectPanel {
+      background: var(--bg);
+    }
+
+    body.light .ds4-bar-fill {
+      background: var(--accent);
+    }
+
+    body.light input[type=range] {
+      accent-color: var(--accent);
+    }
+
+    body.light ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.22);
+    }
+
+    /* Titlul din header — gradientul alb→accent e invizibil pe fundal deschis */
+    body.light header h1 {
+      background: linear-gradient(135deg, #0b1220 0%, var(--accent-dim) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    body.light header {
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    /* Etichetele cu culori NEON hardcodate inline → variante închise, lizibile pe alb.
+       Regula din CSS cu !important învinge culoarea inline (care n-are !important). */
+    body.light [style*="color:var(--green)"] {
+      color: #0a7d52 !important;
+    }
+
+    /* verde */
+    body.light [style*="color:#00d68f"] {
+      color: #0a7d52 !important;
+    }
+
+    body.light [style*="color:var(--cyan)"] {
+      color: #0c7a86 !important;
+    }
+
+    /* teal */
+    body.light [style*="color:var(--purple)"] {
+      color: #7c3aed !important;
+    }
+
+    /* mov */
+    body.light [style*="color:var(--yellow)"] {
+      color: #c2410c !important;
+    }
+
+    /* portocaliu */
+    body.light [style*="color:var(--yellow)"] {
+      color: #c2410c !important;
+    }
+
+    body.light [style*="color:var(--yellow)"] {
+      color: #a16207 !important;
+    }
+
+    /* galben */
+    body.light [style*="color:var(--accent)"] {
+      color: #1d4ed8 !important;
+    }
+
+    /* albastru */
+    body.light [style*="color:var(--accent)"] {
+      color: #1561c4 !important;
+    }
+
+    body.light [style*="color:var(--red)"] {
+      color: #c81e2c !important;
+    }
+
+    /* roșu */
+    body.light [style*="color:#ff4444"] {
+      color: #c81e2c !important;
+    }
+
+    /* Slidere colorate hardcodate → accentul lor pe variante închise */
+    body.light input[style*="accent-color:var(--green)"] {
+      accent-color: #0a7d52 !important;
+    }
+
+    body.light input[style*="accent-color:var(--cyan)"] {
+      accent-color: #0c7a86 !important;
+    }
+
+    body.light input[style*="accent-color:var(--yellow)"] {
+      accent-color: #a16207 !important;
+    }
+
+    /* Tranziție smoothă la schimbare temă */
+    body {
+      transition: background .25s, color .25s;
+    }
+
+    .card,
+    header {
+      transition: background .25s, border-color .25s, box-shadow .25s;
+    }
+
+    /* Buton toggle temă */
+    .theme-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .2s;
+      flex-shrink: 0;
+    }
+
+    .theme-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      font-size: 13.5px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ════════════════════════════════════════
+       HEADER
+    ════════════════════════════════════════ */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      background: rgba(11, 14, 24, 0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), var(--shadow-sm);
+    }
+
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg,
+          transparent 0%, var(--accent-glow) 30%,
+          var(--accent-glow) 70%, transparent 100%);
+      opacity: .6;
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: .3px;
+      background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hdr-right {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .conn-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 0 2px var(--red-glow);
+      transition: background .4s, box-shadow .4s;
+    }
+
+    .conn-dot.online {
+      background: var(--green);
+      box-shadow: 0 0 0 3px var(--green-glow);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 3px var(--green-glow);
+      }
+
+      50% {
+        box-shadow: 0 0 0 6px rgba(0, 214, 143, 0.08);
+      }
+    }
+
+    .logout-btn {
+      padding: 5px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all .2s;
+    }
+
+    .logout-btn:hover {
+      border-color: var(--red-glow);
+      color: var(--red);
+      background: rgba(255, 71, 87, 0.08);
+    }
+
+    /* ════════════════════════════════════════
+       OBSTACLE BANNER
+    ════════════════════════════════════════ */
+    #obstBanner {
+      display: none;
+      width: 100%;
+      padding: 11px 20px;
+      background: linear-gradient(90deg, #c0392b, var(--red), #c0392b);
+      background-size: 200% 100%;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      animation: banner-slide 1.5s linear infinite;
+    }
+
+    #obstBanner.visible {
+      display: block;
+    }
+
+    #crashBanner {
+      display: none;
+      width: 100%;
+      padding: 11px 20px;
+      background: linear-gradient(90deg, #6d1a9c, #a55eea, #6d1a9c);
+      background-size: 200% 100%;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      animation: banner-slide 1.5s linear infinite;
+    }
+
+    #crashBanner.visible {
+      display: block;
+    }
+
+    .ultrasonic-dist {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--green);
+      transition: color 0.2s, border-color 0.2s;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .ultrasonic-dist.caution {
+      color: var(--yellow);
+      border-color: rgba(255, 165, 2, 0.35);
+    }
+
+    .ultrasonic-dist.danger {
+      color: var(--red);
+      border-color: rgba(255, 71, 87, 0.35);
+    }
+
+    /* ── Ultrasonic 6-sensor grid (parking) ── */
+    .sensor-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .sensor-row-lbl {
+      grid-column: 1 / -1;
+      font-size: 9.5px;
+      letter-spacing: .8px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .sensor-cell {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 2px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .sensor-cell .sc-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .sensor-cell .sc-lbl {
+      font-size: 8.5px;
+      color: var(--muted);
+      margin-top: 3px;
+      letter-spacing: .3px;
+    }
+
+    .sensor-cell.near {
+      border-color: rgba(255, 71, 87, 0.55);
+      background: rgba(255, 71, 87, 0.10);
+    }
+
+    .sensor-cell.near .sc-val {
+      color: var(--red);
+    }
+
+    .sensor-cell.mid {
+      border-color: rgba(255, 165, 2, 0.45);
+    }
+
+    .sensor-cell.mid .sc-val {
+      color: var(--yellow);
+    }
+
+    .sensor-cell.far .sc-val {
+      color: var(--green);
+    }
+
+    .sensor-cell.off .sc-val {
+      color: var(--muted);
+    }
+
+    #parkingState {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 9px;
+      border-radius: 7px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    #parkingState.run {
+      border-color: rgba(0, 214, 143, 0.4);
+      color: var(--green);
+    }
+
+    #parkingState.err {
+      border-color: rgba(255, 71, 87, 0.4);
+      color: var(--red);
+    }
+
+    @keyframes banner-slide {
+      0% {
+        background-position: 0% 0%;
+      }
+
+      100% {
+        background-position: 200% 0%;
+      }
+    }
+
+    /* ════════════════════════════════════════
+       LAYOUT GRID
+    ════════════════════════════════════════ */
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(320px, 2fr) minmax(280px, 1.5fr) minmax(240px, 1fr);
+      gap: 14px;
+      padding: 16px;
+    }
+
+    /* ════════════════════════════════════════
+       CARDS
+    ════════════════════════════════════════ */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      overflow: hidden;
+      position: relative;
+      transition: border-color .25s, box-shadow .25s;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(135deg,
+          rgba(255, 255, 255, 0.025) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03);
+    }
+
+    .card-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .card-title .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent-glow);
+    }
+
+    /* ════════════════════════════════════════
+       VIDEO CARD
+    ════════════════════════════════════════ */
+    #videoCard {
+      grid-row: span 2;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #videoWrap {
+      flex: 1;
+      position: relative;
+      background: #000;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      min-height: 240px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    }
+
+    #videoFeed {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    #snapshotImg {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+
+    .vid-badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .6px;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #modeBadge {
+      left: 10px;
+      right: auto;
+      color: var(--green);
+      border-color: rgba(0, 214, 143, 0.2);
+    }
+
+    #recBadge {
+      background: var(--red);
+      border-color: transparent;
+      color: #fff;
+      display: none;
+      animation: rec-blink 1.2s ease-in-out infinite;
+    }
+
+    @keyframes rec-blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .6;
+      }
+    }
+
+    /* ════════════════════════════════════════
+       CHARTS CARD
+    ════════════════════════════════════════ */
+    #chartsCard {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 85px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 4px;
+    }
+
+    /* ════════════════════════════════════════
+       SYSTEM STATS
+    ════════════════════════════════════════ */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat-box {
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      padding: 12px 8px;
+      text-align: center;
+      border: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+
+    .stat-box::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+      background: var(--accent);
+      opacity: .4;
+      transition: opacity .2s;
+    }
+
+    .stat-box:nth-child(1)::after {
+      background: var(--yellow);
+    }
+
+    .stat-box:nth-child(2)::after {
+      background: var(--accent);
+    }
+
+    .stat-box:nth-child(3)::after {
+      background: var(--green);
+    }
+
+    .stat-val {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -.5px;
+      line-height: 1;
+    }
+
+    .stat-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+
+    #tempVal {
+      color: var(--yellow);
+    }
+
+    #cpuVal {
+      color: var(--accent);
+    }
+
+    #ramVal {
+      color: var(--green);
+    }
+
+    /* ════════════════════════════════════════
+       SIGN HISTORY
+    ════════════════════════════════════════ */
+    #signList {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    #signList li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      transition: border-color .15s;
+    }
+
+    #signList li:hover {
+      border-color: var(--border-hi);
+    }
+
+    .sign-label {
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .sign-conf {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .sign-ts {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .no-signs {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 14px 0;
+      font-style: italic;
+    }
+
+    /* ════════════════════════════════════════
+       CONTROLS CARD
+    ════════════════════════════════════════ */
+    #controlsCard {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      flex: 1;
+      min-width: 76px;
+      padding: 8px 11px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      text-align: center;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all .18s cubic-bezier(.25, .46, .45, .94);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity .18s;
+    }
+
+    .btn:hover {
+      border-color: rgba(91, 141, 239, 0.5);
+      color: var(--accent);
+      background: rgba(91, 141, 239, 0.07);
+      box-shadow: 0 0 14px rgba(91, 141, 239, 0.12);
+    }
+
+    .btn:hover::after {
+      opacity: 1;
+    }
+
+    .btn.active {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 18px var(--accent-glow), 0 2px 8px rgba(0, 0, 0, 0.3);
+      font-weight: 700;
+    }
+
+    .btn.active::after {
+      opacity: 1;
+    }
+
+    .btn.danger {
+      border-color: rgba(255, 71, 87, 0.4);
+      color: var(--red);
+    }
+
+    .btn.danger:hover,
+    .btn.danger.active {
+      background: linear-gradient(135deg, var(--red), #c0392b);
+      border-color: var(--red);
+      color: #fff;
+      box-shadow: 0 0 18px var(--red-glow), 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn.success {
+      border-color: rgba(0, 214, 143, 0.3);
+      color: var(--green);
+    }
+
+    .btn.success.active {
+      background: linear-gradient(135deg, var(--green), #00a86b);
+      border-color: var(--green);
+      color: #fff;
+      box-shadow: 0 0 18px var(--green-glow), 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .slider-row label {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    input[type=range] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+      height: 4px;
+    }
+
+    #joystickZone {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--surface) 60%, rgba(91, 141, 239, 0.05) 100%);
+      border: 1.5px solid var(--border);
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4),
+        0 0 0 4px rgba(91, 141, 239, 0.04);
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* ════════════════════════════════════════
+       EVENT LOG
+    ════════════════════════════════════════ */
+    #eventLog {
+      list-style: none;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 4px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    #eventLog li {
+      background: rgba(255, 255, 255, 0.022);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 11px;
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      transition: border-color .15s;
+    }
+
+    #eventLog li:hover {
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .ev-ts {
+      color: var(--muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-size: 10px;
+    }
+
+    .ev-msg {
+      color: var(--text);
+    }
+
+    .ev-info .ev-msg {
+      color: var(--accent);
+    }
+
+    .ev-warn .ev-msg {
+      color: var(--yellow);
+    }
+
+    .ev-error .ev-msg {
+      color: var(--red);
+    }
+
+    .ev-ok .ev-msg {
+      color: var(--green);
+    }
+
+    /* ════════════════════════════════════════
+       SESSION CARD
+    ════════════════════════════════════════ */
+    #sessionCard {
+      grid-column: 3;
+    }
+
+    .sess-info {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .sess-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 5px 8px;
+      border-radius: 7px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .sess-key {
+      color: var(--muted);
+    }
+
+    .sess-val {
+      font-weight: 600;
+    }
+
+    .link-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(91, 141, 239, 0.3);
+      background: rgba(91, 141, 239, 0.06);
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 8px;
+      transition: all .18s;
+    }
+
+    .link-btn:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 18px var(--accent-glow);
+    }
+
+    /* ════════════════════════════════════════
+       CALIB PANEL
+    ════════════════════════════════════════ */
+    #calibPanel {
+      display: none;
+    }
+
+    #calibPanel.open {
+      display: block;
+    }
+
+    #calibImg {
+      width: 100%;
+      border-radius: 8px;
+      margin-top: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .warp-sliders {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    /* ════════════════════════════════════════
+       TRAJECTORY CARD
+    ════════════════════════════════════════ */
+    #trajCard {
+      grid-column: 1 / 3;
+    }
+
+    #pidCard {
+      grid-column: 3;
+    }
+
+    .traj-inner {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+    }
+
+    #trajCanvas {
+      border-radius: var(--radius-sm);
+      background: #04060d;
+      border: 1px solid var(--border);
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      flex-shrink: 0;
+    }
+
+    .traj-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .traj-stat {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .traj-stat span:first-child {
+      color: var(--muted);
+    }
+
+    .traj-stat span:last-child {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* ════════════════════════════════════════
+       PID CARD
+    ════════════════════════════════════════ */
+    .pid-gains {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .pid-gain-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .pid-gain-row label {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .pid-debug {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .pid-debug-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+    }
+
+    .pid-debug-lbl {
+      width: 22px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .pid-debug-bar {
+      flex: 1;
+      height: 7px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 4px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .pid-debug-fill {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      border-radius: 3px;
+      transition: left .08s, width .08s;
+    }
+
+    .pid-debug-val {
+      width: 52px;
+      text-align: right;
+      font-weight: 700;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ════════════════════════════════════════
+       SUB-PANELS (adaptive, mock, direct)
+    ════════════════════════════════════════ */
+    #adaptPanel {
+      display: none;
+      margin-top: 8px;
+      padding: 12px;
+      background: rgba(0, 214, 143, 0.04);
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(0, 214, 143, 0.15);
+    }
+
+    #adaptPanel .adap-lbl {
+      font-size: 10.5px;
+      color: var(--green);
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    /* ════════════════════════════════════════
+       VIDEO OVERLAY BADGES
+    ════════════════════════════════════════ */
+    #laneModeBadge {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(0, 206, 201, 0.3);
+      color: var(--cyan);
+      display: none;
+    }
+
+    #speedLimitBadge {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 5px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 800;
+      background: rgba(180, 0, 0, 0.88);
+      backdrop-filter: blur(6px);
+      color: #fff;
+      display: none;
+      letter-spacing: .6px;
+      border: 1.5px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 0 20px rgba(255, 71, 87, 0.4);
+    }
+
+    /* ════════════════════════════════════════
+       CONFIDENCE BAR
+    ════════════════════════════════════════ */
+    .conf-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .conf-lbl {
+      font-size: 10.5px;
+      color: var(--muted);
+      width: 66px;
+      flex-shrink: 0;
+    }
+
+    .conf-bar-wrap {
+      flex: 1;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .conf-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      width: 0%;
+      background: var(--green);
+      transition: width .2s ease, background .35s;
+      box-shadow: 0 0 6px currentColor;
+    }
+
+    .conf-val {
+      width: 36px;
+      text-align: right;
+      font-size: 11px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ════════════════════════════════════════
+       DS4 CARD
+    ════════════════════════════════════════ */
+    #ds4Card {
+      grid-column: 1 / -1;
+    }
+
+    .ds4-inner {
+      display: grid;
+      grid-template-columns: 220px 1fr 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .ds4-status {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ds4-status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .ds4-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 6px var(--red-glow);
+      transition: background .4s, box-shadow .4s;
+      flex-shrink: 0;
+    }
+
+    .ds4-dot.online {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green-glow);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    .ds4-axes {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ds4-axis-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .ds4-axis-lbl {
+      color: var(--muted);
+      width: 32px;
+      flex-shrink: 0;
+    }
+
+    .ds4-bar-wrap {
+      flex: 1;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .ds4-bar-fill {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      border-radius: 3px;
+      background: var(--accent);
+      transition: left .05s, width .05s;
+    }
+
+    .ds4-axis-val {
+      width: 44px;
+      text-align: right;
+      font-weight: 700;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ds4-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ds4-btn-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .ds4-badge {
+      padding: 4px 10px;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: var(--surface);
+      transition: all .12s;
+      letter-spacing: .2px;
+    }
+
+    .ds4-badge.pressed {
+      border-color: var(--accent);
+      color: #fff;
+      background: rgba(91, 141, 239, 0.18);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .ds4-badge.cross.pressed {
+      background: rgba(231, 76, 60, .2);
+      border-color: #e74c3c;
+      color: #ff7675;
+      box-shadow: 0 0 10px rgba(231, 76, 60, .3);
+    }
+
+    .ds4-badge.circle.pressed {
+      background: rgba(230, 126, 34, .2);
+      border-color: #e67e22;
+      color: #fdba74;
+      box-shadow: 0 0 10px rgba(230, 126, 34, .3);
+    }
+
+    .ds4-badge.square.pressed {
+      background: rgba(165, 94, 234, .2);
+      border-color: var(--purple);
+      color: #d8b4fe;
+      box-shadow: 0 0 10px rgba(165, 94, 234, .3);
+    }
+
+    .ds4-badge.triangle.pressed {
+      background: rgba(46, 204, 113, .2);
+      border-color: #2ecc71;
+      color: #6ee7b7;
+      box-shadow: 0 0 10px rgba(46, 204, 113, .3);
+    }
+
+    .ds4-sticks {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stick-wrap {
+      text-align: center;
+    }
+
+    .stick-wrap canvas {
+      display: block;
+      margin: 0 auto 5px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--surface) 60%, rgba(0, 0, 0, 0.5) 100%);
+      border: 1px solid var(--border);
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.5);
+    }
+
+    .stick-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: .5px;
+    }
+
+    .ds4-triggers {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .trigger-wrap {
+      flex: 1;
+    }
+
+    .trigger-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+
+    .trigger-bar-wrap {
+      height: 9px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 5px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .trigger-bar-fill {
+      height: 100%;
+      border-radius: 5px;
+      width: 0%;
+      transition: width .06s;
+    }
+
+    #l2Bar {
+      background: linear-gradient(90deg, #7c3aed, var(--purple));
+    }
+
+    #r2Bar {
+      background: linear-gradient(90deg, #c05621, var(--yellow));
+    }
+
+    /* ════════════════════════════════════════
+       SCROLLBAR
+    ════════════════════════════════════════ */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* ════════════════════════════════════════
+       RESPONSIVE
+    ════════════════════════════════════════ */
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      #videoCard {
+        grid-column: span 2;
+        grid-row: span 1;
+      }
+    }
+
+    @media (max-width: 600px) {
+
+      /* ── Layout ── */
+      .grid {
+        display: flex;
+        flex-direction: column;
+        padding: 8px;
+        gap: 8px;
+      }
+
+      /* ── Ordering: camera first, joystick+controls second, rest below ── */
+      #videoCard {
+        order: 1;
+      }
+
+      #controlsCard {
+        order: 2;
+      }
+
+      #chartsCard {
+        order: 3;
+      }
+
+      #systemCard {
+        order: 4;
+      }
+
+      #eventLogCard {
+        order: 5;
+      }
+
+      #sessionCard {
+        order: 6;
+      }
+
+      #ds4Card {
+        order: 7;
+      }
+
+      #trajCard {
+        order: 8;
+      }
+
+      #pidCard {
+        order: 9;
+      }
+
+      /* ── Reset grid-column/row so flex takes over ── */
+      #videoCard,
+      #chartsCard,
+      #systemCard,
+      #controlsCard,
+      #eventLogCard,
+      #sessionCard,
+      #ds4Card,
+      #trajCard,
+      #pidCard,
+      .card {
+        grid-column: unset !important;
+        grid-row: unset !important;
+      }
+
+      #videoWrap {
+        min-height: 200px;
+      }
+
+      /* ── Hide advanced controls in controlsCard on mobile ── */
+      .mobile-hidden {
+        display: none !important;
+      }
+
+      /* ── Bigger joystick zone on touch ── */
+      #joystickZone {
+        width: 170px;
+        height: 170px;
+      }
+
+      /* ── Compact header ── */
+      header h1 {
+        font-size: 14px;
+      }
+
+      header {
+        padding: 0 14px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>&#9678; Rover Command Center</h1>
+    <div class="hdr-right">
+      <div class="conn-dot" id="connDot" title="Connection status"></div>
+      <span id="connLabel" style="font-size:11px;color:var(--muted)">Offline</span>
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Schimbă tema">🌙</button>
+      <form action="/logout" method="post" style="margin:0">
+        <button class="logout-btn" type="submit">Logout</button>
+      </form>
+    </div>
+  </header>
+
+  <div id="obstBanner">&#9888; OBSTACOL DETECTAT — MA&#536;INA S-A OPRIT</div>
+  <div id="crashBanner">&#9889; CRASH IMINENT — FRÂNARE DE URGENȚĂ (ULTRASONIC)</div>
+
+  <div class="grid">
+
+    <!-- ── Video card ── -->
+    <div class="card" id="videoCard">
+      <div class="card-title"><span class="dot"></span>Live Feed</div>
+      <div id="videoWrap">
+        <img id="videoFeed" src="/video_feed" alt="live feed" onerror="startSnapshot()"
+          onload="clearInterval(snapTimer)">
+        <img id="snapshotImg" alt="snapshot">
+        <span class="vid-badge" id="modeBadge">MANUAL</span>
+        <span class="vid-badge" id="recBadge">&#9679; REC</span>
+        <span id="laneModeBadge">&#128648; SMALL TRACK</span>
+        <span id="speedLimitBadge">&#128677; — km/h</span>
+      </div>
+    </div>
+
+    <!-- ── Charts card ── -->
+    <div class="card" id="chartsCard">
+      <div class="card-title"><span class="dot"></span>Telemetrie Live</div>
+      <div class="chart-wrap"><canvas id="speedChart"></canvas></div>
+      <div class="chart-wrap"><canvas id="turnChart"></canvas></div>
+      <div class="chart-wrap"><canvas id="curveChart"></canvas></div>
+
+      <!-- Lane detection confidence -->
+      <div class="conf-row">
+        <span class="conf-lbl">Conf. benzi</span>
+        <div class="conf-bar-wrap">
+          <div class="conf-bar-fill" id="confBarFill"></div>
+        </div>
+        <span class="conf-val" id="confVal">—</span>
+      </div>
+
+      <!-- Active speed limit display -->
+      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:12px">
+        <span style="color:var(--muted)">Limită viteză activă:</span>
+        <span id="activeLimitLbl" style="font-weight:700;color:var(--red)">—</span>
+        <button class="btn" id="btnClearLimit" onclick="clearSpeedLimit()"
+          style="padding:3px 8px;font-size:10px;min-width:0;margin-left:6px;display:none">
+          ✕ Anulare
+        </button>
+      </div>
+      <div style="margin-top:6px;display:flex;align-items:center;gap:8px">
+        <button class="btn active" id="btnSpeedLimit" onclick="toggleSpeedLimit()"
+          style="font-size:11px;padding:5px 10px;flex:1" title="Aplică automat limita din semne detectate">
+          &#128677; Limită viteză: ON
+        </button>
+      </div>
+    </div>
+
+    <!-- ── System stats + sign history ── -->
+    <div class="card" id="systemCard">
+      <div class="card-title"><span class="dot"></span>Sistem</div>
+      <div class="stat-grid">
+        <div class="stat-box">
+          <div class="stat-val" id="tempVal">—</div>
+          <div class="stat-lbl">°C Temp</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="cpuVal">—</div>
+          <div class="stat-lbl">CPU %</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="ramVal">—</div>
+          <div class="stat-lbl">RAM %</div>
+        </div>
+      </div>
+
+      <div class="card-title" style="margin-top:16px"><span class="dot" style="background:var(--yellow)"></span>Semne
+        Detectate</div>
+      <ul id="signList">
+        <li class="no-signs">Nicio detecție</li>
+      </ul>
+
+      <!-- Behavior state -->
+      <div style="margin-top:12px;font-size:12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--muted)">Comportament:</span>
+        <span id="behaviorBadge" style="font-weight:700;color:var(--green)">normal</span>
+      </div>
+      <div style="margin-top:4px;font-size:12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--muted)">Multiplicator viteză:</span>
+        <span id="multVal" style="font-weight:700">1.00×</span>
+      </div>
+    </div>
+
+    <!-- ── Controls card ── -->
+    <div class="card" id="controlsCard">
+      <div class="card-title"><span class="dot" style="background:var(--green)"></span>Control</div>
+
+      <div class="btn-row">
+        <button class="btn active" id="btnManual" onclick="setMode(true)">Manual</button>
+        <button class="btn" id="btnAuto" onclick="setMode(false)">Lane Assist</button>
+        <button class="btn danger" id="btnStop" onclick="emergencyStop()">&#9888; STOP</button>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn success" id="btnRec" onclick="toggleRecord()">&#9679; Rec</button>
+        <button class="btn" id="btnSigns" onclick="toggleSigns()">Semne</button>
+        <button class="btn" id="btnObst" onclick="toggleObstacles()">Obstacole</button>
+      </div>
+
+      <div class="btn-row mobile-hidden">
+        <button class="btn" id="btnUltrasonic" onclick="toggleUltrasonic()"
+          title="Senzor HC-SR04 — frânare automată la &lt;30 cm">&#128268; Crash Det.</button>
+        <span class="ultrasonic-dist" id="ultrasonicDist" title="Distanță cel mai apropiat senzor față">— cm</span>
+      </div>
+
+      <!-- Auto-parking -->
+      <div class="btn-row">
+        <button class="btn" id="btnParking" onclick="startParking()"
+          title="Parcare automată: se întoarce 180° și intră cu spatele în garaj">&#127359; Parcare Auto</button>
+        <button class="btn danger" id="btnParkingStop" onclick="stopParking()" style="display:none">&#9209; Stop
+          Parcare</button>
+      </div>
+
+      <!-- Parking status + 6-sensor readout -->
+      <div id="parkingPanel" class="mobile-hidden"
+        style="margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;border:1px solid rgba(0,214,143,0.18)">
+        <div
+          style="font-size:10.5px;color:var(--green);font-weight:700;letter-spacing:.8px;margin-bottom:6px;display:flex;justify-content:space-between">
+          <span>&#128225; SENZORI ULTRASONICI</span>
+          <span id="parkingPhase" style="color:var(--muted)">idle</span>
+        </div>
+        <div id="parkingState">Inactiv</div>
+        <div class="sensor-grid">
+          <div class="sensor-row-lbl">Față</div>
+          <div class="sensor-cell off" id="scFL">
+            <div class="sc-val">—</div>
+            <div class="sc-lbl">FAȚĂ-ST</div>
+          </div>
+          <div class="sensor-cell off" id="scFC">
+            <div class="sc-val">—</div>
+            <div class="sc-lbl">FAȚĂ-C</div>
+          </div>
+          <div class="sensor-cell off" id="scFR">
+            <div class="sc-val">—</div>
+            <div class="sc-lbl">FAȚĂ-DR</div>
+          </div>
+          <div class="sensor-row-lbl">Spate</div>
+          <div class="sensor-cell off" id="scRL">
+            <div class="sc-val">—</div>
+            <div class="sc-lbl">SPATE-ST</div>
+          </div>
+          <div class="sensor-cell off" id="scRC">
+            <div class="sc-val">—</div>
+            <div class="sc-lbl">SPATE-C</div>
+          </div>
+          <div class="sensor-cell off" id="scRR">
+            <div class="sc-val">—</div>
+            <div class="sc-lbl">SPATE-DR</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="joystickZone"></div>
+
+      <div class="slider-row">
+        <label>Viteză de bază <span id="speedLbl">65%</span></label>
+        <input type="range" id="speedSlider" min="0" max="100" value="65" oninput="onSpeedSlider(this.value)">
+      </div>
+
+      <div class="slider-row">
+        <label>Viraj maxim <span id="maxTurnLbl">80%</span></label>
+        <input type="range" id="maxTurnSlider" min="10" max="100" value="80" oninput="onMaxTurnSlider(this.value)">
+      </div>
+
+      <div class="btn-row mobile-hidden">
+        <button class="btn" id="btnCalib" onclick="toggleCalib()">&#9883; Warp</button>
+        <button class="btn" id="btnCamera" onclick="toggleCamPanel()">&#9728; Camera</button>
+        <button class="btn" id="btnMock" onclick="toggleMockLane()">&#127909; Demo</button>
+      </div>
+
+      <div class="btn-row mobile-hidden">
+        <button class="btn" id="btnAdapt" onclick="toggleAdaptive()" title="Viteza scade automat în curbe">&#9195;
+          Adaptive</button>
+        <button class="btn" id="btnPid" onclick="togglePid()"
+          title="Activează regulatorul PID pentru lane-keeping">PID</button>
+        <button class="btn" id="btnLaneMode" onclick="toggleLaneMode()"
+          title="Mod pistă mică: sliding window fără bird's eye view">&#128648; Pistă Mică</button>
+      </div>
+
+      <div class="btn-row mobile-hidden">
+        <a class="btn" href="/analytics" style="text-align:center;text-decoration:none;flex:1">&#128202; Analytics</a>
+        <a class="btn" href="/race" style="text-align:center;text-decoration:none;flex:1">&#9202; Race Timer</a>
+        <a class="btn" href="/config" style="text-align:center;text-decoration:none;flex:1">&#9881; Config</a>
+      </div>
+
+      <!-- Playback Record Panel -->
+      <div id="pbPanel" class="mobile-hidden"
+        style="margin-top:10px;padding:12px;background:rgba(255,100,0,0.07);border-radius:8px;border:1px solid rgba(255,100,0,0.2)">
+        <div style="font-size:10.5px;color:var(--yellow);font-weight:700;letter-spacing:.8px;margin-bottom:8px">&#9654; RECORD
+          & PLAYBACK</div>
+        <div class="btn-row">
+          <button class="btn" id="btnPbRec" onclick="pbToggleRecord()"
+            style="background:rgba(255,50,50,0.15);border-color:rgba(255,50,50,0.4)">&#9679; Înregistrează</button>
+          <button class="btn" id="btnPbPlay" onclick="pbTogglePlay()"
+            style="background:rgba(0,214,143,0.1);border-color:rgba(0,214,143,0.3)">&#9654; Play</button>
+          <button class="btn" id="btnPbClear" onclick="pbClear()" style="background:rgba(255,100,0,0.1)">&#128465;
+            Șterge</button>
+        </div>
+        <div id="pbStatus" style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">Nicio secvență
+          înregistrată</div>
+      </div>
+
+      <!-- Adaptive speed panel -->
+      <div id="adaptPanel">
+        <div class="adap-lbl">ADAPTIVE SPEED — frânare în curbe</div>
+        <div class="slider-row">
+          <label style="color:var(--green)">Coeficient curbă k <span id="curveKLbl">0.6</span></label>
+          <input type="range" id="curveKSlider" min="0" max="150" value="60" oninput="onCurveK(this.value)"
+            style="accent-color:var(--green)">
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">
+          k=0 → viteză constantă &nbsp;·&nbsp; k=1.5 → oprire completă la curbă maximă<br>
+          Formula: v = v_baza × max(0.3,&nbsp;1 − k × curve²)
+        </div>
+      </div>
+
+      <!-- Mock lane demo panel -->
+      <div id="mockPanel"
+        style="display:none;margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;border:1px solid #5a1ea0">
+        <div style="font-size:11px;color:var(--purple);font-weight:700;margin-bottom:6px">DEMO MODE — curbă simulată</div>
+        <div class="slider-row">
+          <label style="color:var(--purple)">Curbă manuală <span id="mockCurveLbl">0.00</span></label>
+          <input type="range" id="mockCurveSlider" min="-100" max="100" value="0" oninput="onMockCurve(this.value)">
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">
+          Stânga ←100 &nbsp;|&nbsp; Drept 0 &nbsp;|&nbsp; Dreapta 100→<br>
+          Camera nu mai este folosită pentru direcție.
+        </div>
+      </div>
+
+      <!-- Small track / direct mode panel -->
+      <div id="laneDirectPanel" style="display:none;margin-top:8px;padding:10px;
+         background:var(--surface);border-radius:8px;border:1px solid #1a5a6a">
+        <div style="font-size:11px;color:var(--cyan);font-weight:700;margin-bottom:6px">
+          PISTĂ MICĂ — Sliding Window (fără bird's eye)
+        </div>
+        <div class="slider-row">
+          <label style="color:var(--cyan)">ROI — ignoră sus <span id="roiFracLbl">55%</span></label>
+          <input type="range" id="roiFracSlider" min="20" max="78" value="55" oninput="onRoiFrac(this.value)"
+            style="accent-color:var(--cyan)">
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.6">
+          <strong style="color:var(--text)">20%</strong> = analizează 80% din cadru (pistă largă)<br>
+          <strong style="color:var(--text)">55%</strong> = analizează doar 45% jos (recomandat)<br>
+          <strong style="color:var(--text)">75%</strong> = analizează doar 25% jos (pistă foarte mică)<br>
+          Crește dacă mașina "vede" prea mult fundal.<br>
+          Ferestre colorate: <span style="color:var(--yellow)">■</span> stânga
+          &nbsp;<span style="color:var(--accent)">■</span> dreapta
+        </div>
+      </div>
+
+      <!-- Warp calibration -->
+      <div id="calibPanel">
+        <div class="warp-sliders">
+          <div class="slider-row">
+            <label>wTop <span id="wTopLbl">22</span></label>
+            <input type="range" id="wTop" min="0" max="240" value="22" oninput="onWarp()">
+          </div>
+          <div class="slider-row">
+            <label>hTop <span id="hTopLbl">165</span></label>
+            <input type="range" id="hTop" min="0" max="240" value="165" oninput="onWarp()">
+          </div>
+          <div class="slider-row">
+            <label>wBot <span id="wBotLbl">0</span></label>
+            <input type="range" id="wBot" min="0" max="240" value="0" oninput="onWarp()">
+          </div>
+          <div class="slider-row">
+            <label>hBot <span id="hBotLbl">240</span></label>
+            <input type="range" id="hBot" min="0" max="240" value="240" oninput="onWarp()">
+          </div>
+        </div>
+        <img id="calibImg" src="" alt="warp preview">
+      </div>
+
+      <!-- Camera adjustments -->
+      <div id="camPanel" style="display:none">
+        <div class="slider-row" style="margin-top:8px">
+          <label>Luminozitate <span id="brightLbl">50</span></label>
+          <input type="range" id="brightSlider" min="0" max="100" value="50" oninput="onCam()">
+        </div>
+        <div class="slider-row">
+          <label>Contrast <span id="contrastLbl">50</span></label>
+          <input type="range" id="contrastSlider" min="0" max="100" value="50" oninput="onCam()">
+        </div>
+        <div class="slider-row">
+          <label>Saturație <span id="satLbl">50</span></label>
+          <input type="range" id="satSlider" min="0" max="100" value="50" oninput="onCam()">
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Event log card ── -->
+    <div class="card" id="eventLogCard">
+      <div class="card-title"><span class="dot" style="background:var(--muted)"></span>Jurnal Evenimente</div>
+      <ul id="eventLog"></ul>
+    </div>
+
+    <!-- ── Session card ── -->
+    <div class="card" id="sessionCard">
+      <div class="card-title"><span class="dot" style="background:var(--green)"></span>Sesiune</div>
+      <div class="sess-info">
+        <div class="sess-row"><span class="sess-key">Stare</span><span class="sess-val" id="sessState">Inactivă</span>
+        </div>
+        <div class="sess-row"><span class="sess-key">Sesiune</span><span class="sess-val" id="sessName"
+            style="font-size:10px;word-break:break-all">—</span></div>
+        <div class="sess-row"><span class="sess-key">Cadre salvate</span><span class="sess-val" id="sessFrames">0</span>
+        </div>
+        <div class="sess-row"><span class="sess-key">Durată</span><span class="sess-val" id="sessDur">00:00</span></div>
+      </div>
+      <a class="link-btn" href="/sessions">&#9654; Vizualizare Sesiuni</a>
+      <a class="link-btn" href="/train" style="margin-top:6px;border-color:var(--yellow);color:var(--yellow)">&#9889;
+        Antrenare Model</a>
+    </div>
+
+    <!-- ── DS4 Controller card ── -->
+    <div class="card" id="ds4Card">
+      <div class="card-title">
+        <span class="dot" style="background:#9b59b6"></span>DS4 / PS4 Controller
+        <button class="btn" id="btnDs4" onclick="toggleDs4()"
+          style="margin-left:auto;min-width:80px;padding:5px 12px;font-size:11px">
+          Activat
+        </button>
+      </div>
+
+      <div class="ds4-inner">
+
+        <!-- Status + info -->
+        <div class="ds4-status">
+          <div class="ds4-status-row">
+            <div class="ds4-dot" id="ds4Dot"></div>
+            <span id="ds4Label" style="font-weight:600">Deconectat</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6">
+            <div>Viteză: <strong id="ds4SpeedVal">0.00</strong></div>
+            <div>Viraj: &nbsp;<strong id="ds4TurnVal">0.00</strong></div>
+            <div>L2 turbo: <strong id="ds4L2Val">0%</strong></div>
+            <div>R2 frână: <strong id="ds4R2Val">0%</strong></div>
+          </div>
+          <!-- Trigger bars -->
+          <div class="ds4-triggers">
+            <div class="trigger-wrap">
+              <div class="trigger-lbl">L2 Turbo</div>
+              <div class="trigger-bar-wrap">
+                <div class="trigger-bar-fill" id="l2Bar"></div>
+              </div>
+            </div>
+            <div class="trigger-wrap">
+              <div class="trigger-lbl">R2 Frână</div>
+              <div class="trigger-bar-wrap">
+                <div class="trigger-bar-fill" id="r2Bar"></div>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5">
+            △ Manual/Auto &nbsp;·&nbsp; ✕ STOP<br>
+            ○ Rec &nbsp;·&nbsp; □ Semne<br>
+            L1/R1 ±5% viteză &nbsp;·&nbsp; ↑↓ D-pad<br>
+            Share: Demo &nbsp;·&nbsp; Options: Obstacole
+          </div>
+        </div>
+
+        <!-- Stick visualization -->
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600;letter-spacing:.5px">STICK-URI
+          </div>
+          <div class="ds4-sticks">
+            <div class="stick-wrap">
+              <canvas id="lsCanvas" width="80" height="80"></canvas>
+              <div class="stick-lbl">Left Stick</div>
+            </div>
+            <div class="stick-wrap">
+              <canvas id="rsCanvas" width="80" height="80"></canvas>
+              <div class="stick-lbl">Right Stick</div>
+            </div>
+          </div>
+          <!-- Axis bars -->
+          <div class="ds4-axes" style="margin-top:12px">
+            <div class="ds4-axis-row">
+              <span class="ds4-axis-lbl">LS X</span>
+              <div class="ds4-bar-wrap">
+                <div class="ds4-bar-fill" id="axLSX"></div>
+              </div>
+              <span class="ds4-axis-val" id="axLSXv">0.00</span>
+            </div>
+            <div class="ds4-axis-row">
+              <span class="ds4-axis-lbl">LS Y</span>
+              <div class="ds4-bar-wrap">
+                <div class="ds4-bar-fill" id="axLSY"></div>
+              </div>
+              <span class="ds4-axis-val" id="axLSYv">0.00</span>
+            </div>
+            <div class="ds4-axis-row">
+              <span class="ds4-axis-lbl">RS X</span>
+              <div class="ds4-bar-wrap">
+                <div class="ds4-bar-fill" id="axRSX"></div>
+              </div>
+              <span class="ds4-axis-val" id="axRSXv">0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Button states -->
+        <div class="ds4-btns">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;letter-spacing:.5px">BUTOANE
+          </div>
+          <div class="ds4-btn-row">
+            <span class="ds4-badge cross" id="dsBcross">✕ Cross</span>
+            <span class="ds4-badge circle" id="dsBcircle">○ Circle</span>
+            <span class="ds4-badge square" id="dsBsquare">□ Square</span>
+            <span class="ds4-badge triangle" id="dsBtriangle">△ Triangle</span>
+          </div>
+          <div class="ds4-btn-row">
+            <span class="ds4-badge" id="dsBleft1">L1</span>
+            <span class="ds4-badge" id="dsBright1">R1</span>
+            <span class="ds4-badge" id="dsBshare">Share</span>
+            <span class="ds4-badge" id="dsBoptions">Options</span>
+          </div>
+          <div class="ds4-btn-row">
+            <span class="ds4-badge" id="dsBl3">L3</span>
+            <span class="ds4-badge" id="dsBr3">R3</span>
+            <span class="ds4-badge" id="dsBps">PS</span>
+            <span class="ds4-badge" id="dsBtpad">Touchpad</span>
+          </div>
+          <div style="margin-top:8px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;letter-spacing:.5px">D-PAD
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,28px);gap:3px;justify-content:center">
+              <span></span>
+              <span class="ds4-badge" id="dsDup" style="text-align:center;padding:4px 0">▲</span>
+              <span></span>
+              <span class="ds4-badge" id="dsDleft" style="text-align:center;padding:4px 0">◀</span>
+              <span class="ds4-badge" style="text-align:center;padding:4px 0;opacity:.3">·</span>
+              <span class="ds4-badge" id="dsDright" style="text-align:center;padding:4px 0">▶</span>
+              <span></span>
+              <span class="ds4-badge" id="dsDdown" style="text-align:center;padding:4px 0">▼</span>
+              <span></span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- ds4-inner -->
+    </div><!-- ds4Card -->
+
+    <!-- ── Trajectory Visualization card ── -->
+    <div class="card" id="trajCard">
+      <div class="card-title">
+        <span class="dot" style="background:var(--green)"></span>Traiectorie Estimată
+        <span style="margin-left:auto;font-size:10px;color:var(--muted)">Dead Reckoning</span>
+        <button class="btn" onclick="resetTrajectory()"
+          style="margin-left:8px;min-width:60px;padding:4px 10px;font-size:11px">Reset</button>
+      </div>
+      <div class="traj-inner">
+        <canvas id="trajCanvas" width="280" height="280"></canvas>
+        <div class="traj-info">
+          <div style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.5px;margin-bottom:4px">POZIȚIE
+            ESTIMATĂ</div>
+          <div class="traj-stat"><span>X (m est.)</span><span id="trajX">0.00</span></div>
+          <div class="traj-stat"><span>Y (m est.)</span><span id="trajY">0.00</span></div>
+          <div class="traj-stat"><span>Direcție</span><span id="trajHeadingLbl">0°</span></div>
+          <div class="traj-stat"><span>Distanță totală</span><span id="trajDist">0.00 m</span></div>
+          <div class="traj-stat"><span>Puncte salvate</span><span id="trajPts">0</span></div>
+          <div style="margin-top:12px;font-size:10px;color:var(--muted);line-height:1.7">
+            <strong style="color:var(--text)">Legendă culori:</strong><br>
+            <span style="color:var(--green)">●</span> Poziție curentă<br>
+            <span style="color:var(--accent)">—</span> Traiectorie rapidă<br>
+            <span style="color:var(--yellow)">—</span> Traiectorie lentă<br>
+            <span style="color:var(--red)">—</span> Mers înapoi
+          </div>
+          <div style="margin-top:auto;padding-top:16px">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:4px">
+              ⚠ Estimare — eroarea crește în timp fără GPS
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PID Tuning card ── -->
+    <div class="card" id="pidCard">
+      <div class="card-title">
+        <span class="dot" style="background:var(--yellow)"></span>PID Controller
+        <button class="btn" id="btnPidCard" onclick="togglePid()"
+          style="margin-left:auto;min-width:70px;padding:4px 10px;font-size:11px">OFF</button>
+      </div>
+
+      <div class="pid-gains">
+        <div class="pid-gain-row">
+          <label>Kp — Proporțional <span id="kpLbl">0.70</span></label>
+          <input type="range" id="kpSlider" min="0" max="300" value="70" oninput="onPidGain()"
+            style="accent-color:var(--yellow)">
+        </div>
+        <div class="pid-gain-row">
+          <label>Ki — Integral <span id="kiLbl">0.02</span></label>
+          <input type="range" id="kiSlider" min="0" max="50" value="2" oninput="onPidGain()"
+            style="accent-color:var(--yellow)">
+        </div>
+        <div class="pid-gain-row">
+          <label>Kd — Derivativ <span id="kdLbl">0.15</span></label>
+          <input type="range" id="kdSlider" min="0" max="100" value="15" oninput="onPidGain()"
+            style="accent-color:var(--yellow)">
+        </div>
+      </div>
+
+      <button class="btn" onclick="resetPid()"
+        style="margin-top:10px;width:100%;font-size:11px;color:var(--yellow);border-color:var(--yellow)">
+        &#8635; Reset Integrator
+      </button>
+
+      <!-- Live P/I/D debug bars -->
+      <div class="pid-debug">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.5px;margin-bottom:2px">CONTRIBUȚII
+          LIVE</div>
+        <div class="pid-debug-row">
+          <span class="pid-debug-lbl" style="color:var(--accent)">P</span>
+          <div class="pid-debug-bar">
+            <div class="pid-debug-fill" id="pidPBar" style="background:#4f8ef7"></div>
+          </div>
+          <span class="pid-debug-val" id="pidPVal">0.000</span>
+        </div>
+        <div class="pid-debug-row">
+          <span class="pid-debug-lbl" style="color:var(--green)">I</span>
+          <div class="pid-debug-bar">
+            <div class="pid-debug-fill" id="pidIBar" style="background:#2dce89"></div>
+          </div>
+          <span class="pid-debug-val" id="pidIVal">0.000</span>
+        </div>
+        <div class="pid-debug-row">
+          <span class="pid-debug-lbl" style="color:var(--yellow)">D</span>
+          <div class="pid-debug-bar">
+            <div class="pid-debug-fill" id="pidDBar" style="background:#f7c948"></div>
+          </div>
+          <span class="pid-debug-val" id="pidDVal">0.000</span>
+        </div>
+        <div class="pid-debug-row">
+          <span class="pid-debug-lbl" style="color:var(--red)">OUT</span>
+          <div class="pid-debug-bar">
+            <div class="pid-debug-fill" id="pidOutBar" style="background:#f75d5d"></div>
+          </div>
+          <span class="pid-debug-val" id="pidOutVal">0.000</span>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;font-size:10px;color:var(--muted);line-height:1.6">
+        Eroare curentă: <strong id="pidErrVal" style="color:var(--text)">0.000</strong><br>
+        Integrator: <strong id="pidIntVal" style="color:var(--text)">0.000</strong>
+      </div>
+    </div>
+
+  </div><!-- .grid -->
+
+  <script>
+    // ══════════════════════════════════════════════════════════════════
+    // Socket.IO
+    // ══════════════════════════════════════════════════════════════════
+    const socket = io({ transports: ['websocket', 'polling'] });
+    const connDot = document.getElementById('connDot');
+    const connLabel = document.getElementById('connLabel');
+
+    socket.on('connect', () => {
+      connDot.classList.add('online');
+      connLabel.textContent = 'Online';
+      logEvent('Conectat la server', 'ok');
+    });
+    socket.on('disconnect', () => {
+      connDot.classList.remove('online');
+      connLabel.textContent = 'Offline';
+      logEvent('Deconectat de la server', 'error');
+    });
+
+    // ══════════════════════════════════════════════════════════════════
+    // Snapshot fallback (for browsers that don't support MJPEG)
+    // ══════════════════════════════════════════════════════════════════
+    let snapTimer = null;
+    function startSnapshot() {
+      const vid = document.getElementById('videoFeed');
+      const snap = document.getElementById('snapshotImg');
+      vid.style.display = 'none';
+      snap.style.display = 'block';
+      snapTimer = setInterval(() => {
+        snap.src = '/snapshot?t=' + Date.now();
+      }, 100);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Charts
+    // ══════════════════════════════════════════════════════════════════
+    const WINDOW = 50;
+    // Culori de grafic în funcție de temă (text/grilă lizibile pe ambele fundaluri)
+    function chartTheme() {
+      const light = document.body.classList.contains('light');
+      return {
+        tick: light ? '#000000' : '#6b7299',
+        grid: light ? 'rgba(15,23,42,0.14)' : '#2a2d38',
+        // Culori de linie vii, vizibile pe fundalul respectiv
+        series: light
+          ? { speed: '#1d4ed8', turn: '#15803d', curve: '#b45309' }
+          : { speed: '#4f8ef7', turn: '#2dce89', curve: '#f7c948' },
+      };
+    }
+    function makeChart(id, label, key) {
+      const ctx = document.getElementById(id).getContext('2d');
+      const t = chartTheme();
+      const color = t.series[key];
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: Array(WINDOW).fill(''),
+          datasets: [{
+            label, data: Array(WINDOW).fill(0), _key: key,
+            borderColor: color, backgroundColor: color + '22',
+            borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          plugins: { legend: { labels: { color: t.tick, font: { size: 11, weight: '600' } } } },
+          scales: {
+            x: { display: false },
+            y: {
+              min: -1.1, max: 1.1, grid: { color: t.grid },
+              ticks: { color: t.tick, font: { size: 10 }, stepSize: 0.5 }
+            }
+          }
+        }
+      });
+    }
+    const speedChart = makeChart('speedChart', 'Viteză', 'speed');
+    const turnChart = makeChart('turnChart', 'Viraj', 'turn');
+    const curveChart = makeChart('curveChart', 'Curbă', 'curve');
+
+    // Re-aplică culorile graficelor la schimbarea temei
+    function applyChartTheme() {
+      const t = chartTheme();
+      [[speedChart, 'speed'], [turnChart, 'turn'], [curveChart, 'curve']].forEach(([ch, key]) => {
+        if (!ch) return;
+        const c = t.series[key];
+        ch.data.datasets[0].borderColor = c;
+        ch.data.datasets[0].backgroundColor = c + '22';
+        ch.options.plugins.legend.labels.color = t.tick;
+        ch.options.scales.y.grid.color = t.grid;
+        ch.options.scales.y.ticks.color = t.tick;
+        ch.update('none');
+      });
+    }
+
+    function pushChart(chart, val) {
+      chart.data.datasets[0].data.push(val);
+      chart.data.datasets[0].data.shift();
+      chart.update('none');
+    }
+
+    // telemetry — handler complet este în secțiunea Trajectory (mai jos)
+    // control_state — handler complet este în secțiunea Adaptive Speed (mai jos)
+
+    socket.on('record_status', d => syncRecUI(d.recording, d.session, d.frames));
+
+    // ══════════════════════════════════════════════════════════════════
+    // Sign updates
+    // ══════════════════════════════════════════════════════════════════
+    const signHistory = [];
+    socket.on('sign_update', d => {
+      document.getElementById('behaviorBadge').textContent = d.behavior;
+      document.getElementById('multVal').textContent = d.multiplier + '×';
+
+      d.detections.forEach(det => {
+        const ts = new Date().toLocaleTimeString('ro-RO');
+        signHistory.unshift({ label: det.label, conf: Math.round(det.confidence * 100), ts });
+        if (signHistory.length > 20) signHistory.pop();
+        logEvent(`Semn: ${det.label} (${Math.round(det.confidence * 100)}%)`, 'warn');
+      });
+      renderSignList();
+    });
+
+    function renderSignList() {
+      const ul = document.getElementById('signList');
+      if (signHistory.length === 0) {
+        ul.innerHTML = '<li class="no-signs">Nicio detecție</li>'; return;
+      }
+      ul.innerHTML = signHistory.slice(0, 10).map(s =>
+        `<li><span class="sign-label">${s.label}</span>
+         <span class="sign-conf">${s.conf}%</span>
+         <span class="sign-ts">${s.ts}</span></li>`
+      ).join('');
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Obstacle alert
+    // ══════════════════════════════════════════════════════════════════
+    socket.on('obstacle_alert', d => {
+      const banner = document.getElementById('obstBanner');
+      if (d.detected) {
+        banner.classList.add('visible');
+        logEvent('Obstacol detectat — mașina oprită!', 'error');
+      } else {
+        banner.classList.remove('visible');
+      }
+    });
+
+    // ══════════════════════════════════════════════════════════════════
+    // Training progress
+    // ══════════════════════════════════════════════════════════════════
+    socket.on('training_progress', d => {
+      logEvent(`Antrenare: Epoch ${d.epoch} — Loss ${d.loss?.toFixed(4)} (${d.percent}%)`, 'info');
+    });
+
+    // ══════════════════════════════════════════════════════════════════
+    // Event log
+    // ══════════════════════════════════════════════════════════════════
+    function logEvent(msg, type = 'info') {
+      const ul = document.getElementById('eventLog');
+      const li = document.createElement('li');
+      li.className = 'ev-' + type;
+      const ts = new Date().toLocaleTimeString('ro-RO');
+      li.innerHTML = `<span class="ev-ts">${ts}</span><span class="ev-msg">${msg}</span>`;
+      ul.prepend(li);
+      // Keep only last 100 entries
+      while (ul.children.length > 100) ul.removeChild(ul.lastChild);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Recording
+    // ══════════════════════════════════════════════════════════════════
+    let recActive = false;
+    let recStart = null;
+    let recTimer = null;
+
+    function syncRecUI(active, sess, frames) {
+      recActive = active;
+      const btn = document.getElementById('btnRec');
+      const badge = document.getElementById('recBadge');
+      btn.classList.toggle('active', active);
+      badge.style.display = active ? 'inline' : 'none';
+
+      document.getElementById('sessState').textContent = active ? 'Activă ●' : 'Inactivă';
+      document.getElementById('sessName').textContent = sess || '—';
+      document.getElementById('sessFrames').textContent = frames;
+
+      if (active && !recStart) {
+        recStart = Date.now();
+        recTimer = setInterval(() => {
+          const s = Math.floor((Date.now() - recStart) / 1000);
+          const mm = String(Math.floor(s / 60)).padStart(2, '0');
+          const ss = String(s % 60).padStart(2, '0');
+          document.getElementById('sessDur').textContent = mm + ':' + ss;
+        }, 1000);
+      } else if (!active) {
+        recStart = null;
+        clearInterval(recTimer);
+        document.getElementById('sessDur').textContent = '00:00';
+      }
+    }
+
+    function toggleRecord() {
+      recActive = !recActive;
+      socket.emit('toggle_record', { recording: recActive });
+      logEvent(recActive ? 'Înregistrare pornită' : 'Înregistrare oprită', recActive ? 'ok' : 'info');
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Mode control
+    // ══════════════════════════════════════════════════════════════════
+    let isManual = true;
+
+    function applyMode(manual) {
+      isManual = manual;
+      document.getElementById('btnManual').classList.toggle('active', manual);
+      document.getElementById('btnAuto').classList.toggle('active', !manual);
+      document.getElementById('modeBadge').textContent = manual ? 'MANUAL' : 'AUTO';
+      document.getElementById('modeBadge').style.color = manual ? 'var(--accent)' : 'var(--green)';
+    }
+
+    function setMode(manual) {
+      socket.emit('toggle_mode', { manual });
+      logEvent(manual ? 'Mod schimbat: Manual' : 'Mod schimbat: Lane Assist', 'info');
+    }
+
+    function emergencyStop() {
+      socket.emit('emergency_stop');
+      logEvent('STOP DE URGENȚĂ activat!', 'error');
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Signs + Obstacles + Ultrasonic
+    // ══════════════════════════════════════════════════════════════════
+    let signsOn = false;
+    let obstOn = false;
+    let ultrasonicOn = false;
+
+    function toggleSigns() {
+      signsOn = !signsOn;
+      socket.emit('toggle_signs', { enabled: signsOn });
+      document.getElementById('btnSigns').classList.toggle('active', signsOn);
+      logEvent('Detecție semne: ' + (signsOn ? 'ON' : 'OFF'), 'info');
+    }
+
+    function toggleObstacles() {
+      obstOn = !obstOn;
+      socket.emit('toggle_obstacles', { enabled: obstOn });
+      document.getElementById('btnObst').classList.toggle('active', obstOn);
+      logEvent('Detecție obstacole: ' + (obstOn ? 'ON' : 'OFF'), 'info');
+    }
+
+    function toggleUltrasonic() {
+      ultrasonicOn = !ultrasonicOn;
+      socket.emit('toggle_ultrasonic', { enabled: ultrasonicOn });
+      document.getElementById('btnUltrasonic').classList.toggle('active', ultrasonicOn);
+      logEvent('Crash detection (ultrasonic): ' + (ultrasonicOn ? 'ON' : 'OFF'), 'info');
+    }
+
+    socket.on('ultrasonic_update', d => {
+      const distEl = document.getElementById('ultrasonicDist');
+      const banner = document.getElementById('crashBanner');
+      if (d.cm === null || d.cm === undefined) {
+        distEl.textContent = '— cm';
+        distEl.className = 'ultrasonic-dist';
+      } else {
+        distEl.textContent = d.cm.toFixed(1) + ' cm';
+        if (d.cm < 30) {
+          distEl.className = 'ultrasonic-dist danger';
+        } else if (d.cm < 50) {
+          distEl.className = 'ultrasonic-dist caution';
+        } else {
+          distEl.className = 'ultrasonic-dist';
+        }
+      }
+      if (d.dangerous) {
+        banner.classList.add('visible');
+        logEvent('CRASH IMINENT — frânare de urgență! (' + (d.cm ? d.cm.toFixed(1) : '?') + ' cm)', 'error');
+      } else {
+        banner.classList.remove('visible');
+      }
+      if (d.distances) updateSensorGrid(d.distances);
+    });
+
+    // ══════════════════════════════════════════════════════════════════
+    // Ultrasonic 6-sensor grid + Auto-parking
+    // ══════════════════════════════════════════════════════════════════
+    const SENSOR_CELLS = {
+      front_left: 'scFL', front_center: 'scFC', front_right: 'scFR',
+      rear_left: 'scRL', rear_center: 'scRC', rear_right: 'scRR',
+    };
+
+    function updateSensorGrid(dists) {
+      Object.entries(SENSOR_CELLS).forEach(([key, id]) => {
+        const cell = document.getElementById(id);
+        if (!cell) return;
+        const v = dists[key];
+        const valEl = cell.querySelector('.sc-val');
+        if (v === null || v === undefined) {
+          valEl.textContent = '—';
+          cell.className = 'sensor-cell off';
+        } else {
+          valEl.textContent = Math.round(v);
+          let cls = 'far';
+          if (v < 15) cls = 'near';
+          else if (v < 35) cls = 'mid';
+          cell.className = 'sensor-cell ' + cls;
+        }
+      });
+    }
+
+    let parkingActive = false;
+
+    function startParking() {
+      socket.emit('start_parking', {});
+      logEvent('Parcare automată: pornită', 'warn');
+    }
+
+    function stopParking() {
+      socket.emit('stop_parking', {});
+      logEvent('Parcare automată: oprită manual', 'info');
+    }
+
+    socket.on('parking_status', d => {
+      parkingActive = !!d.active;
+      const btn = document.getElementById('btnParking');
+      const btnStop = document.getElementById('btnParkingStop');
+      const panel = document.getElementById('parkingPanel');
+      const stateEl = document.getElementById('parkingState');
+      const phaseEl = document.getElementById('parkingPhase');
+
+      if (btn) btn.classList.toggle('active', parkingActive);
+      if (btnStop) btnStop.style.display = parkingActive ? '' : 'none';
+      if (panel) panel.style.display = 'block';
+      if (phaseEl) phaseEl.textContent = d.state || 'idle';
+      if (stateEl) {
+        stateEl.textContent = d.message || '—';
+        stateEl.className = '';
+        if (parkingActive) stateEl.classList.add('run');
+        else if (d.state === 'error' || d.state === 'aborted') stateEl.classList.add('err');
+      }
+      if (d.distances && Object.keys(d.distances).length) updateSensorGrid(d.distances);
+
+      // Log terminal states once
+      if (!parkingActive && (d.state === 'done' || d.state === 'aborted' || d.state === 'error')) {
+        logEvent('Parcare: ' + (d.message || d.state), d.state === 'done' ? 'ok' : 'warn');
+      }
+    });
+
+    // ══════════════════════════════════════════════════════════════════
+    // Speed slider
+    // ══════════════════════════════════════════════════════════════════
+    function onSpeedSlider(v) {
+      document.getElementById('speedLbl').textContent = v + '%';
+      socket.emit('set_speed', { speed: v / 100 });
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Record & Playback
+    // ══════════════════════════════════════════════════════════════════
+    let pbIsRecording = false;
+
+    function pbToggleRecord() {
+      pbIsRecording = !pbIsRecording;
+      const btn = document.getElementById('btnPbRec');
+      const status = document.getElementById('pbStatus');
+      if (pbIsRecording) {
+        socket.emit('pb_record_start');
+        btn.textContent = '⏹ Stop înregistrare';
+        btn.style.background = 'rgba(255,50,50,0.4)';
+        status.textContent = '● Înregistrare în curs...';
+        status.style.color = '#ff4444';
+        logEvent('Playback: înregistrare pornită', 'info');
+      } else {
+        socket.emit('pb_record_stop');
+        btn.textContent = '● Înregistrează';
+        btn.style.background = 'rgba(255,50,50,0.15)';
+        status.textContent = '✓ Secvență salvată — apasă ▶ Play pentru redare';
+        status.style.color = '#00d68f';
+        logEvent('Playback: înregistrare oprită', 'ok');
+      }
+    }
+
+    let pbIsPlaying = false;
+    function pbTogglePlay() {
+      pbIsPlaying = !pbIsPlaying;
+      const btn = document.getElementById('btnPbPlay');
+      if (pbIsPlaying) {
+        socket.emit('pb_play_start');
+        btn.textContent = '⏹ Stop Play';
+        btn.style.background = 'rgba(0,214,143,0.3)';
+        logEvent('Playback: pornit', 'ok');
+      } else {
+        socket.emit('pb_play_stop');
+        btn.textContent = '▶ Play';
+        btn.style.background = 'rgba(0,214,143,0.1)';
+        logEvent('Playback: oprit', 'info');
+      }
+    }
+
+    function pbClear() {
+      socket.emit('pb_clear');
+      pbIsPlaying = false;
+      document.getElementById('btnPbPlay').textContent = '▶ Play';
+      document.getElementById('pbStatus').textContent = 'Nicio secvență înregistrată';
+      logEvent('Playback: secvență ștearsă', 'info');
+    }
+
+    socket.on('pb_state', d => {
+      const status = document.getElementById('pbStatus');
+      if (d.recording) {
+        status.textContent = '● Înregistrare în curs...';
+      } else if (d.playing) {
+        status.textContent = '▶ Playback activ — Lane Assist rulează secvența';
+        status.style.color = '#00d68f';
+      } else if (d.has_sequence) {
+        const dur = d.duration ? ` (${d.duration}s)` : '';
+        status.textContent = `✓ Secvență salvată${dur} — apasă ▶ Play pentru redare`;
+        status.style.color = '#00d68f';
+      } else {
+        status.textContent = 'Nicio secvență înregistrată';
+        status.style.color = 'var(--muted)';
+      }
+    });
+
+    let maxTurnTimer = null;
+    function onMaxTurnSlider(v) {
+      document.getElementById('maxTurnLbl').textContent = v + '%';
+      clearTimeout(maxTurnTimer);
+      maxTurnTimer = setTimeout(() => socket.emit('set_max_turn', { max_turn: v / 100 }), 80);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Warp calibration
+    // ══════════════════════════════════════════════════════════════════
+    let calibOpen = false;
+    function toggleCalib() {
+      calibOpen = !calibOpen;
+      document.getElementById('calibPanel').classList.toggle('open', calibOpen);
+      document.getElementById('btnCalib').classList.toggle('active', calibOpen);
+      socket.emit('set_calib_overlay', { enabled: calibOpen });
+      if (calibOpen) refreshCalibImg();
+    }
+
+    function applyWarpPoints(pts) {
+      const ids = ['wTop', 'hTop', 'wBot', 'hBot'];
+      const lbls = ['wTopLbl', 'hTopLbl', 'wBotLbl', 'hBotLbl'];
+      pts.forEach((v, i) => {
+        document.getElementById(ids[i]).value = v;
+        document.getElementById(lbls[i]).textContent = v;
+      });
+    }
+
+    let warpTimer = null;
+    function onWarp() {
+      ['wTop', 'hTop', 'wBot', 'hBot'].forEach(id => {
+        document.getElementById(id + 'Lbl').textContent = document.getElementById(id).value;
+      });
+      clearTimeout(warpTimer);
+      warpTimer = setTimeout(() => {
+        socket.emit('set_warp', {
+          wTop: +document.getElementById('wTop').value,
+          hTop: +document.getElementById('hTop').value,
+          wBot: +document.getElementById('wBot').value,
+          hBot: +document.getElementById('hBot').value,
+        });
+        refreshCalibImg();
+      }, 150);
+    }
+
+    function refreshCalibImg() {
+      document.getElementById('calibImg').src = '/warp_preview?t=' + Date.now();
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Camera panel
+    // ══════════════════════════════════════════════════════════════════
+    let camOpen = false;
+    function toggleCamPanel() {
+      camOpen = !camOpen;
+      document.getElementById('camPanel').style.display = camOpen ? 'block' : 'none';
+      document.getElementById('btnCamera').classList.toggle('active', camOpen);
+    }
+
+    let camTimer = null;
+    function onCam() {
+      document.getElementById('brightLbl').textContent = document.getElementById('brightSlider').value;
+      document.getElementById('contrastLbl').textContent = document.getElementById('contrastSlider').value;
+      document.getElementById('satLbl').textContent = document.getElementById('satSlider').value;
+      clearTimeout(camTimer);
+      camTimer = setTimeout(() => {
+        socket.emit('set_camera', {
+          brightness: +document.getElementById('brightSlider').value,
+          contrast: +document.getElementById('contrastSlider').value,
+          saturation: +document.getElementById('satSlider').value,
+        });
+      }, 100);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Virtual joystick
+    // ══════════════════════════════════════════════════════════════════
+    const joystick = nipplejs.create({
+      zone: document.getElementById('joystickZone'),
+      mode: 'static',
+      position: { left: '50%', top: '50%' },
+      color: '#4f8ef7',
+      size: 100,
+    });
+
+    joystick.on('move', (evt, data) => {
+      if (!isManual) return;
+      const angle = data.angle.radian;
+      const force = Math.min(data.force, 1.0);
+      const spd = Math.sin(angle) * force;
+      const trn = Math.cos(angle) * force;
+      socket.emit('motor_move', { speed: spd, turn: trn });
+    });
+
+    joystick.on('end', () => {
+      socket.emit('motor_move', { speed: 0, turn: 0 });
+    });
+
+    // ══════════════════════════════════════════════════════════════════
+    // Mock lane mode
+    // ══════════════════════════════════════════════════════════════════
+    let mockOn = false;
+    function toggleMockLane() {
+      mockOn = !mockOn;
+      socket.emit('toggle_mock_lane', { enabled: mockOn });
+      document.getElementById('btnMock').classList.toggle('active', mockOn);
+      document.getElementById('mockPanel').style.display = mockOn ? 'block' : 'none';
+      logEvent('Demo mode (mock lane): ' + (mockOn ? 'ON' : 'OFF'), mockOn ? 'warn' : 'info');
+    }
+    let mockCurveTimer = null;
+    function onMockCurve(v) {
+      const curve = v / 100;
+      document.getElementById('mockCurveLbl').textContent = (curve >= 0 ? '+' : '') + curve.toFixed(2);
+      clearTimeout(mockCurveTimer);
+      mockCurveTimer = setTimeout(() => {
+        socket.emit('set_mock_curve', { curve });
+      }, 50);
+    }
+    // control_state pentru mock_lane este gestionat în handlerul consolidat (secțiunea Adaptive Speed)
+
+    // ══════════════════════════════════════════════════════════════════
+    // Keyboard control
+    // ══════════════════════════════════════════════════════════════════
+    const pressedKeys = new Set();
+    document.addEventListener('keydown', e => {
+      const k = e.key.toLowerCase();
+      if (!['w', 'a', 's', 'd', ' '].includes(k) || pressedKeys.has(k)) return;
+      e.preventDefault();
+      if (k === ' ') { emergencyStop(); return; }
+      pressedKeys.add(k);
+      socket.emit('drive_command', { key: k, action: 'press' });
+    });
+    document.addEventListener('keyup', e => {
+      const k = e.key.toLowerCase();
+      if (!['w', 'a', 's', 'd'].includes(k)) return;
+      pressedKeys.delete(k);
+      socket.emit('drive_command', { key: k, action: 'release' });
+    });
+
+    // ══════════════════════════════════════════════════════════════════
+    // DS4 Controller UI
+    // ══════════════════════════════════════════════════════════════════
+    let ds4EnabledLocal = true;
+
+    function toggleDs4() {
+      ds4EnabledLocal = !ds4EnabledLocal;
+      socket.emit('toggle_ds4', { enabled: ds4EnabledLocal });
+      document.getElementById('btnDs4').classList.toggle('active', ds4EnabledLocal);
+      document.getElementById('btnDs4').textContent = ds4EnabledLocal ? 'Activat' : 'Dezactivat';
+      logEvent('DS4 controller: ' + (ds4EnabledLocal ? 'activat' : 'dezactivat'), ds4EnabledLocal ? 'ok' : 'info');
+    }
+
+    // Draw stick visualization on a canvas
+    function drawStick(canvasId, x, y) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      const cx = W / 2, cy = H / 2, r = W / 2 - 4;
+
+      // Background
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#16181d';
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+
+      // Crosshair
+      ctx.strokeStyle = '#2a2d38'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy); ctx.stroke();
+
+      // Outer ring
+      ctx.strokeStyle = '#2a2d38'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+
+      // Dot
+      const px = cx + x * (r - 6);
+      const py = cy + y * (r - 6);
+      const grad = ctx.createRadialGradient(px, py, 0, px, py, 7);
+      grad.addColorStop(0, '#7fb3ff');
+      grad.addColorStop(1, '#4f8ef7');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Update a horizontal axis bar  (val ∈ [-1, 1])
+    function updateAxisBar(barId, valId, val) {
+      const bar = document.getElementById(barId);
+      const lbl = document.getElementById(valId);
+      if (!bar || !lbl) return;
+      // Center is 50%; negative goes left, positive goes right
+      const pct = Math.abs(val) * 50;
+      const leftPct = val >= 0 ? 50 : 50 - pct;
+      bar.style.left = leftPct + '%';
+      bar.style.width = pct + '%';
+      bar.style.background = val >= 0 ? '#4f8ef7' : '#f7c948';
+      lbl.textContent = (val >= 0 ? '+' : '') + val.toFixed(2);
+    }
+
+    socket.on('ds4_state', d => {
+      // Connection dot + label
+      const dot = document.getElementById('ds4Dot');
+      const lbl = document.getElementById('ds4Label');
+      if (d.connected) {
+        dot.classList.add('online');
+        lbl.textContent = 'Conectat';
+      } else {
+        dot.classList.remove('online');
+        lbl.textContent = 'Deconectat';
+      }
+
+      // Enabled sync
+      if (d.enabled !== undefined) {
+        ds4EnabledLocal = d.enabled;
+        document.getElementById('btnDs4').classList.toggle('active', ds4EnabledLocal);
+        document.getElementById('btnDs4').textContent = ds4EnabledLocal ? 'Activat' : 'Dezactivat';
+      }
+
+      // Speed / turn readouts
+      document.getElementById('ds4SpeedVal').textContent = (d.speed ?? 0).toFixed(2);
+      document.getElementById('ds4TurnVal').textContent = (d.turn ?? 0).toFixed(2);
+
+      const axes = d.axes || {};
+      const l2 = axes.l2 ?? 0;
+      const r2 = axes.r2 ?? 0;
+      document.getElementById('ds4L2Val').textContent = Math.round(l2 * 100) + '%';
+      document.getElementById('ds4R2Val').textContent = Math.round(r2 * 100) + '%';
+
+      // Trigger bars
+      document.getElementById('l2Bar').style.width = Math.round(l2 * 100) + '%';
+      document.getElementById('r2Bar').style.width = Math.round(r2 * 100) + '%';
+
+      // Stick canvases
+      drawStick('lsCanvas', axes.ls_x ?? 0, axes.ls_y ?? 0);
+      drawStick('rsCanvas', axes.rs_x ?? 0, axes.rs_y ?? 0);
+
+      // Axis bars
+      updateAxisBar('axLSX', 'axLSXv', axes.ls_x ?? 0);
+      updateAxisBar('axLSY', 'axLSYv', axes.ls_y ?? 0);
+      updateAxisBar('axRSX', 'axRSXv', axes.rs_x ?? 0);
+
+      // Button states
+      const btns = d.buttons || {};
+      const map = {
+        cross: 'dsBcross', circle: 'dsBcircle', square: 'dsBsquare',
+        triangle: 'dsBtriangle', l1: 'dsBleft1', r1: 'dsBright1',
+        share: 'dsBshare', options: 'dsBoptions', l3: 'dsBl3', r3: 'dsBr3', ps: 'dsBps',
+      };
+      Object.entries(map).forEach(([key, id]) => {
+        document.getElementById(id)?.classList.toggle('pressed', btns[key] === 1);
+      });
+
+      // D-pad
+      const hat = d.dpad || { x: 0, y: 0 };
+      document.getElementById('dsDup').classList.toggle('pressed', hat.y > 0);
+      document.getElementById('dsDdown').classList.toggle('pressed', hat.y < 0);
+      document.getElementById('dsDleft').classList.toggle('pressed', hat.x < 0);
+      document.getElementById('dsDright').classList.toggle('pressed', hat.x > 0);
+    });
+
+    // DS4 event notifications (button press actions)
+    const ds4ActionLabels = {
+      emergency_stop: 'DS4 ✕ — STOP DE URGENȚĂ',
+      toggle_record: 'DS4 ○ — Toggle înregistrare',
+      toggle_signs: 'DS4 □ — Toggle detecție semne',
+      toggle_mode: 'DS4 △ — Toggle Manual/Auto',
+      speed_down: 'DS4 L1 — Viteză −5%',
+      speed_up: 'DS4 R1 — Viteză +5%',
+      toggle_mock_lane: 'DS4 Share — Toggle Demo mode',
+      toggle_obstacles: 'DS4 Options — Toggle obstacole',
+      toggle: 'DS4 activare/dezactivare',
+    };
+    socket.on('ds4_event', d => {
+      const msg = ds4ActionLabels[d.action] || `DS4: ${d.action}`;
+      const extra = d.speed !== undefined ? ` (${Math.round(d.speed * 100)}%)` : '';
+      logEvent(msg + extra, d.action === 'emergency_stop' ? 'error' : 'info');
+    });
+
+    // Draw initial empty sticks
+    drawStick('lsCanvas', 0, 0);
+    drawStick('rsCanvas', 0, 0);
+
+    // ══════════════════════════════════════════════════════════════════
+    // Trajectory Visualization (Dead Reckoning)
+    // ══════════════════════════════════════════════════════════════════
+    let trajX = 0, trajY = 0, trajHeading = -Math.PI / 2; // facing up
+    let trajDistTotal = 0;
+    const trajPoints = [];   // {x, y, spd}
+    const TRAJ_SCALE = 50;   // pixels per "unit" (tune as needed)
+    const TRAJ_MAX = 800;  // keep last N points
+    let lastTelTime = null;
+
+    function resetTrajectory() {
+      trajX = 0; trajY = 0; trajHeading = -Math.PI / 2;
+      trajDistTotal = 0;
+      trajPoints.length = 0;
+      lastTelTime = null;
+      document.getElementById('trajX').textContent = '0.00';
+      document.getElementById('trajY').textContent = '0.00';
+      document.getElementById('trajHeadingLbl').textContent = '0°';
+      document.getElementById('trajDist').textContent = '0.00 m';
+      document.getElementById('trajPts').textContent = '0';
+      drawTrajectory();
+      logEvent('Traiectorie resetată', 'info');
+    }
+
+    // Extend existing telemetry handler to update trajectory
+    const _origTelHandler = socket.listeners('telemetry')[0];
+    socket.off('telemetry');
+    socket.on('telemetry', d => {
+      // Call original handler
+      if (d.speed !== undefined) pushChart(speedChart, d.speed);
+      if (d.turn !== undefined) pushChart(turnChart, d.turn);
+      if (d.curve !== undefined) pushChart(curveChart, d.curve);
+
+      // Dead reckoning
+      const now = Date.now();
+      const dt = lastTelTime ? Math.min((now - lastTelTime) / 1000, 0.25) : 0.05;
+      lastTelTime = now;
+
+      const spd = d.speed || 0;
+      const trn = d.turn || 0;
+
+      trajHeading += trn * dt * 1.5;           // turn rate (empirical)
+      const dx = spd * Math.cos(trajHeading) * dt * TRAJ_SCALE;
+      const dy = spd * Math.sin(trajHeading) * dt * TRAJ_SCALE;
+      trajX += dx;
+      trajY += dy;
+      trajDistTotal += Math.sqrt(dx * dx + dy * dy) / TRAJ_SCALE;
+
+      trajPoints.push({ x: trajX, y: trajY, spd });
+      if (trajPoints.length > TRAJ_MAX) trajPoints.shift();
+
+      // Update stat labels
+      document.getElementById('trajX').textContent = (trajX / TRAJ_SCALE).toFixed(2);
+      document.getElementById('trajY').textContent = (trajY / TRAJ_SCALE).toFixed(2);
+      const deg = Math.round(((trajHeading * 180 / Math.PI) % 360 + 360) % 360);
+      document.getElementById('trajHeadingLbl').textContent = deg + '°';
+      document.getElementById('trajDist').textContent = trajDistTotal.toFixed(2) + ' m';
+      document.getElementById('trajPts').textContent = trajPoints.length;
+
+      drawTrajectory();
+
+      // Update PID debug from telemetry
+      if (d.pid) updatePidDebug(d.pid);
+
+      // Lane confidence
+      if (d.confidence !== undefined) updateConfidence(d.confidence);
+    });
+
+    function drawTrajectory() {
+      const canvas = document.getElementById('trajCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      const cx = W / 2, cy = H / 2;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // Background
+      ctx.fillStyle = '#0a0b0e';
+      ctx.fillRect(0, 0, W, H);
+
+      // Grid lines
+      ctx.strokeStyle = '#1a1d26'; ctx.lineWidth = 0.5;
+      for (let x = cx % 28; x < W; x += 28) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+      for (let y = cy % 28; y < H; y += 28) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+
+      // Calculate viewport offset — keep current position centred
+      const last = trajPoints.length > 0 ? trajPoints[trajPoints.length - 1] : { x: 0, y: 0 };
+      const ox = cx - last.x;
+      const oy = cy - last.y;
+
+      // Origin marker
+      ctx.strokeStyle = '#3a3d4a'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(ox, oy - 8); ctx.lineTo(ox, oy + 8); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ox - 8, oy); ctx.lineTo(ox + 8, oy); ctx.stroke();
+
+      if (trajPoints.length >= 2) {
+        for (let i = 1; i < trajPoints.length; i++) {
+          const alpha = 0.15 + 0.85 * (i / trajPoints.length);
+          const p0 = trajPoints[i - 1];
+          const p1 = trajPoints[i];
+          const s = p1.spd;
+
+          // Color: fast+forward=blue, slow=yellow, backward=red
+          let r, g, b;
+          if (s < 0) {
+            r = 247; g = 93; b = 93;   // red — reversing
+          } else if (s > 0.4) {
+            r = 79; g = 142; b = 247;  // blue — fast
+          } else {
+            r = 247; g = 201; b = 72;   // yellow — slow
+          }
+
+          ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(p0.x + ox, p0.y + oy);
+          ctx.lineTo(p1.x + ox, p1.y + oy);
+          ctx.stroke();
+        }
+      }
+
+      // Car indicator — green triangle pointing in heading direction
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(trajHeading + Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(0, -11); ctx.lineTo(-7, 8); ctx.lineTo(7, 8);
+      ctx.closePath();
+      ctx.fillStyle = '#2dce89';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+
+    // Initial draw
+    drawTrajectory();
+
+    // ══════════════════════════════════════════════════════════════════
+    // PID Controller UI
+    // ══════════════════════════════════════════════════════════════════
+    let pidOn = false;
+
+    function togglePid() {
+      pidOn = !pidOn;
+      socket.emit('toggle_pid', { enabled: pidOn });
+      ['btnPid', 'btnPidCard'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.classList.toggle('active', pidOn); el.textContent = pidOn ? 'PID ON' : (id === 'btnPidCard' ? 'OFF' : 'PID'); }
+      });
+      logEvent('PID Controller: ' + (pidOn ? 'ACTIVAT' : 'dezactivat'), pidOn ? 'ok' : 'info');
+    }
+
+    let pidGainTimer = null;
+    function onPidGain() {
+      const kp = document.getElementById('kpSlider').value / 100;
+      const ki = document.getElementById('kiSlider').value / 100;
+      const kd = document.getElementById('kdSlider').value / 100;
+      document.getElementById('kpLbl').textContent = kp.toFixed(2);
+      document.getElementById('kiLbl').textContent = ki.toFixed(2);
+      document.getElementById('kdLbl').textContent = kd.toFixed(2);
+      clearTimeout(pidGainTimer);
+      pidGainTimer = setTimeout(() => {
+        socket.emit('set_pid', { kp, ki, kd });
+      }, 120);
+    }
+
+    function resetPid() {
+      socket.emit('reset_pid');
+      logEvent('PID integrator resetat', 'info');
+    }
+
+    // Update PID bars from value ∈ [-1, 1]
+    function setPidBar(barId, valId, val) {
+      const bar = document.getElementById(barId);
+      const lbl = document.getElementById(valId);
+      if (!bar || !lbl) return;
+      const pct = Math.abs(val) * 50;
+      bar.style.left = (val >= 0 ? 50 : 50 - pct) + '%';
+      bar.style.width = pct + '%';
+      lbl.textContent = (val >= 0 ? '+' : '') + val.toFixed(3);
+    }
+
+    function updatePidDebug(pid) {
+      setPidBar('pidPBar', 'pidPVal', pid.P || 0);
+      setPidBar('pidIBar', 'pidIVal', pid.I || 0);
+      setPidBar('pidDBar', 'pidDVal', pid.D || 0);
+      setPidBar('pidOutBar', 'pidOutVal', pid.output || 0);
+      const errEl = document.getElementById('pidErrVal');
+      const intEl = document.getElementById('pidIntVal');
+      if (errEl) errEl.textContent = (pid.error || 0).toFixed(3);
+      if (intEl) intEl.textContent = (pid.integral || 0).toFixed(3);
+    }
+
+    socket.on('pid_state', d => {
+      if (d.enabled !== undefined) {
+        pidOn = d.enabled;
+        ['btnPid', 'btnPidCard'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) { el.classList.toggle('active', pidOn); el.textContent = pidOn ? 'PID ON' : (id === 'btnPidCard' ? 'OFF' : 'PID'); }
+        });
+      }
+      // Sync sliders
+      if (d.kp !== undefined) {
+        document.getElementById('kpSlider').value = Math.round(d.kp * 100);
+        document.getElementById('kpLbl').textContent = d.kp.toFixed(2);
+      }
+      if (d.ki !== undefined) {
+        document.getElementById('kiSlider').value = Math.round(d.ki * 100);
+        document.getElementById('kiLbl').textContent = d.ki.toFixed(2);
+      }
+      if (d.kd !== undefined) {
+        document.getElementById('kdSlider').value = Math.round(d.kd * 100);
+        document.getElementById('kdLbl').textContent = d.kd.toFixed(2);
+      }
+      updatePidDebug(d);
+    });
+
+    // ══════════════════════════════════════════════════════════════════
+    // Lane Mode (warp vs direct/small-track)
+    // ══════════════════════════════════════════════════════════════════
+    let laneMode = 'warp';   // 'warp' | 'direct'
+
+    function toggleLaneMode() {
+      laneMode = laneMode === 'warp' ? 'direct' : 'warp';
+      socket.emit('set_lane_mode', { mode: laneMode });
+      applyLaneMode(laneMode);
+      logEvent('Lane mode: ' + (laneMode === 'direct' ? 'Pistă Mică (sliding window)' : 'Standard (bird\'s eye)'),
+        laneMode === 'direct' ? 'warn' : 'info');
+    }
+
+    function applyLaneMode(mode) {
+      laneMode = mode;
+      const isD = mode === 'direct';
+      document.getElementById('btnLaneMode').classList.toggle('active', isD);
+      document.getElementById('btnLaneMode').textContent = isD ? '🚗 Standard' : '🚗 Pistă Mică';
+      document.getElementById('laneDirectPanel').style.display = isD ? 'block' : 'none';
+      const badge = document.getElementById('laneModeBadge');
+      badge.style.display = isD ? 'inline' : 'none';
+      // Hide warp calibration when in direct mode (it's not relevant)
+      if (isD && calibOpen) toggleCalib();
+    }
+
+    let roiTimer = null;
+    function onRoiFrac(v) {
+      document.getElementById('roiFracLbl').textContent = v + '%';
+      clearTimeout(roiTimer);
+      roiTimer = setTimeout(() => {
+        socket.emit('set_roi_frac', { frac: v / 100 });
+      }, 100);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Adaptive Speed Control
+    // ══════════════════════════════════════════════════════════════════
+    let adaptOn = false;
+
+    function toggleAdaptive() {
+      adaptOn = !adaptOn;
+      socket.emit('toggle_adaptive_speed', { enabled: adaptOn });
+      document.getElementById('btnAdapt').classList.toggle('active', adaptOn);
+      document.getElementById('adaptPanel').style.display = adaptOn ? 'block' : 'none';
+      logEvent('Adaptive Speed: ' + (adaptOn ? 'ACTIVAT' : 'dezactivat'), adaptOn ? 'ok' : 'info');
+    }
+
+    let curveKTimer = null;
+    function onCurveK(v) {
+      const k = v / 100;
+      document.getElementById('curveKLbl').textContent = k.toFixed(2);
+      clearTimeout(curveKTimer);
+      curveKTimer = setTimeout(() => socket.emit('set_curve_k', { curve_k: k }), 100);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Lane Confidence Score
+    // ══════════════════════════════════════════════════════════════════
+    function updateConfidence(conf) {
+      const fill = document.getElementById('confBarFill');
+      const lbl = document.getElementById('confVal');
+      if (!fill || !lbl) return;
+      if (conf < 0) {
+        fill.style.width = '0%';
+        lbl.textContent = 'N/A';
+        lbl.style.color = 'var(--muted)';
+        return;
+      }
+      fill.style.width = conf + '%';
+      fill.style.background = conf >= 65 ? '#2dce89' : conf >= 35 ? '#f7c948' : '#f75d5d';
+      // text label: variante închise pe fundal deschis ca să se vadă bine
+      const light = document.body.classList.contains('light');
+      const g = light ? '#0a7d52' : '#2dce89';
+      const y = light ? '#a16207' : '#f7c948';
+      const r = light ? '#c81e2c' : '#f75d5d';
+      lbl.style.color = conf >= 65 ? g : conf >= 35 ? y : r;
+      lbl.textContent = conf + '%';
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Speed Limit Enforcement
+    // ══════════════════════════════════════════════════════════════════
+    let speedLimitEnforced = true;
+
+    function toggleSpeedLimit() {
+      speedLimitEnforced = !speedLimitEnforced;
+      socket.emit('toggle_speed_limit', { enabled: speedLimitEnforced });
+      const btn = document.getElementById('btnSpeedLimit');
+      btn.classList.toggle('active', speedLimitEnforced);
+      btn.textContent = speedLimitEnforced ? '🚏 Limită viteză: ON' : '🚏 Limită viteză: OFF';
+      logEvent('Limită viteză automată: ' + (speedLimitEnforced ? 'activată' : 'dezactivată'), 'info');
+    }
+
+    function clearSpeedLimit() {
+      socket.emit('clear_speed_limit');
+      logEvent('Limită viteză anulată manual', 'info');
+    }
+
+    socket.on('speed_limit_update', d => {
+      const badge = document.getElementById('speedLimitBadge');
+      const lbl = document.getElementById('activeLimitLbl');
+      const clearBtn = document.getElementById('btnClearLimit');
+      if (d.active && d.frac !== null) {
+        const kmhText = d.kmh || '?';
+        badge.textContent = `🚏 ${kmhText} km/h`;
+        badge.style.display = 'inline';
+        lbl.textContent = `${kmhText} km/h`;
+        lbl.style.color = 'var(--red)';
+        if (clearBtn) clearBtn.style.display = 'inline';
+        logEvent(`Limită viteză detectată: ${kmhText} km/h`, 'warn');
+      } else {
+        badge.style.display = 'none';
+        lbl.textContent = '—';
+        lbl.style.color = 'var(--muted)';
+        if (clearBtn) clearBtn.style.display = 'none';
+        if (d.active === false && d.frac === null && d.kmh === null) {
+          // server-cleared — don't log unless it was previously set
+        }
+      }
+    });
+
+    // Sync adaptive state from server
+    socket.on('control_state', d => {
+      if (d.manual !== undefined) applyMode(d.manual);
+      if (d.speed !== undefined) {
+        const pct = Math.round(d.speed * 100);
+        document.getElementById('speedSlider').value = pct;
+        document.getElementById('speedLbl').textContent = pct + '%';
+      }
+      if (d.max_turn !== undefined) {
+        const pct = Math.round(d.max_turn * 100);
+        document.getElementById('maxTurnSlider').value = pct;
+        document.getElementById('maxTurnLbl').textContent = pct + '%';
+      }
+      if (d.signs !== undefined) document.getElementById('btnSigns').classList.toggle('active', d.signs);
+      if (d.recording !== undefined) syncRecUI(d.recording, d.rec_session || '', d.rec_frames || 0);
+      if (d.warp_points) applyWarpPoints(d.warp_points);
+      if (d.mock_lane !== undefined) {
+        mockOn = d.mock_lane;
+        document.getElementById('btnMock').classList.toggle('active', mockOn);
+        document.getElementById('mockPanel').style.display = mockOn ? 'block' : 'none';
+      }
+      if (d.adaptive_speed !== undefined) {
+        adaptOn = d.adaptive_speed;
+        document.getElementById('btnAdapt').classList.toggle('active', adaptOn);
+        document.getElementById('adaptPanel').style.display = adaptOn ? 'block' : 'none';
+      }
+      if (d.curve_k !== undefined) {
+        document.getElementById('curveKSlider').value = Math.round(d.curve_k * 100);
+        document.getElementById('curveKLbl').textContent = d.curve_k.toFixed(2);
+      }
+      if (d.lane_mode !== undefined) applyLaneMode(d.lane_mode);
+      if (d.roi_top_frac !== undefined) {
+        const pct = Math.round(d.roi_top_frac * 100);
+        document.getElementById('roiFracSlider').value = pct;
+        document.getElementById('roiFracLbl').textContent = pct + '%';
+      }
+      if (d.speed_limit_enabled !== undefined) {
+        speedLimitEnforced = d.speed_limit_enabled;
+        const btn = document.getElementById('btnSpeedLimit');
+        if (btn) {
+          btn.classList.toggle('active', speedLimitEnforced);
+          btn.textContent = speedLimitEnforced ? '🚏 Limită viteză: ON' : '🚏 Limită viteză: OFF';
+        }
+      }
+      if (d.ultrasonic !== undefined) {
+        ultrasonicOn = d.ultrasonic;
+        document.getElementById('btnUltrasonic').classList.toggle('active', ultrasonicOn);
+      }
+      if (d.parking_available !== undefined) {
+        const pb = document.getElementById('btnParking');
+        if (pb) {
+          pb.disabled = !d.parking_available;
+          pb.style.opacity = d.parking_available ? '' : '0.45';
+          pb.title = d.parking_available
+            ? 'Parcare automată: se întoarce 180° și intră cu spatele în garaj'
+            : 'Indisponibil — senzorii ultrasonici nu sunt detectați';
+        }
+      }
+    });
+  </script>
+
+  <script>
+    /* ── Theme toggle ──────────────────────────────────────────────────── */
+    const THEME_KEY = 'rover-theme';
+
+    function applyTheme(theme) {
+      const isLight = theme === 'light';
+      document.body.classList.toggle('light', isLight);
+      document.getElementById('themeBtn').textContent = isLight ? '🌞' : '🌙';
+      // Actualizează culorile graficelor (text/grilă) pentru tema curentă
+      if (typeof applyChartTheme === 'function') applyChartTheme();
+    }
+
+    function toggleTheme() {
+      const current = document.body.classList.contains('light') ? 'light' : 'dark';
+      const next = current === 'light' ? 'dark' : 'light';
+      localStorage.setItem(THEME_KEY, next);
+      applyTheme(next);
+    }
+
+    /* Aplică tema salvată imediat la încărcare */
+    applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+  </script>
+</body>
+
+</html>

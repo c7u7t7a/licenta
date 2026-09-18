@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ro">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sesiuni Înregistrate — Rover</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    :root {
+      --bg:          #06080f;
+      --surface:     #0b0e18;
+      --card:        #0f1320;
+      --border:      rgba(255,255,255,0.06);
+      --border-hi:   rgba(91,141,239,0.4);
+      --accent:      #5b8def;
+      --accent-dim:  #3a6fd8;
+      --accent-glow: rgba(91,141,239,0.22);
+      --green:       #00d68f;
+      --red:         #ff4757;
+      --yellow:      #ffa502;
+      --text:        #e2e8ff;
+      --text-dim:    #8892b0;
+      --muted:       #4a5275;
+      --radius:      14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      font-size: 13.5px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      background: rgba(11,14,24,0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .back-btn {
+      padding: 6px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      text-decoration: none;
+      font-family: inherit;
+      transition: all .18s;
+    }
+
+    .back-btn:hover {
+      border-color: var(--border-hi);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 14px;
+      padding: 14px;
+      height: calc(100vh - 56px);
+    }
+
+    /* ── Session list ── */
+    .sess-list-wrap {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sess-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 13px;
+      cursor: pointer;
+      transition: all .2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sess-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--accent);
+      transform: scaleY(0);
+      transition: transform .2s;
+      border-radius: 4px 0 0 4px;
+    }
+
+    .sess-card:hover  { border-color: rgba(255,255,255,0.1); background: var(--card); }
+    .sess-card.active { border-color: var(--border-hi); background: rgba(91,141,239,0.06); }
+    .sess-card.active::before { transform: scaleY(1); }
+
+    .sess-name {
+      font-weight: 700;
+      font-size: 11.5px;
+      color: var(--accent);
+      margin-bottom: 7px;
+      word-break: break-all;
+      letter-spacing: .2px;
+    }
+
+    .sess-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+
+    .sess-meta span { font-size: 11px; color: var(--muted); }
+    .sess-meta strong { color: var(--text); }
+
+    .sess-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 9px;
+    }
+
+    .del-btn {
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,71,87,0.3);
+      color: var(--red);
+      background: transparent;
+      cursor: pointer;
+      font-size: 11px;
+      font-family: inherit;
+      font-weight: 600;
+      transition: all .15s;
+    }
+
+    .del-btn:hover { background: rgba(255,71,87,0.1); border-color: var(--red); }
+
+    .empty-msg {
+      color: var(--muted);
+      text-align: center;
+      padding: 30px;
+      font-style: italic;
+    }
+
+    /* ── Player ── */
+    .player-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    .player-top {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 15px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    .card-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* Video player */
+    #playerCanvas {
+      width: 100%;
+      border-radius: 8px;
+      background: #000;
+      display: block;
+      border: 1px solid var(--border);
+    }
+
+    .player-controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 9px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .ctrl-btn {
+      padding: 6px 14px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 600;
+      transition: all .15s;
+      font-weight: 600;
+    }
+
+    .ctrl-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .ctrl-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    #seekBar {
+      flex: 1;
+      accent-color: var(--accent);
+      min-width: 80px;
+    }
+
+    #frameCounter {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .speed-select {
+      padding: 5px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* Telemetry overlay */
+    .tele-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .tele-box {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .tele-val {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .tele-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    #tSpeed {
+      color: var(--accent);
+    }
+
+    #tTurn {
+      color: var(--green);
+    }
+
+    /* Stats chart */
+    .chart-wrap {
+      position: relative;
+      height: 140px;
+    }
+
+    /* Session stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat-row {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .stat-key {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .stat-val {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    #noSession {
+      color: var(--muted);
+      text-align: center;
+      padding: 60px 20px;
+      font-size: 16px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    @media (max-width: 800px) {
+      .main {
+        grid-template-columns: 1fr;
+      }
+
+      .player-top {
+        grid-template-columns: 1fr;
+      }
+    }
+  
+    /* -- Light mode (shared cu index, cheia localStorage 'rover-theme') -- */
+    body.light {
+      --bg:          #eceff5;
+      --surface:     #ffffff;
+      --card:        #ffffff;
+      --card-hover:  #f3f6fc;
+      --border:      rgba(15,23,42,0.20);
+      --border-hi:   #1d4ed8;
+      --accent:      #1d4ed8;
+      --accent-dim:  #1e40af;
+      --accent-glow: rgba(29,78,216,0.20);
+      --green:       #15803d;
+      --green-glow:  rgba(21,128,61,0.20);
+      --red:         #dc2626;
+      --red-glow:    rgba(220,38,38,0.20);
+      --yellow:      #b45309;
+      --purple:      #7c3aed;
+      --cyan:        #0e7490;
+      --text:        #000000;
+      --text-dim:    #000000;
+      --muted:       #1e293b;
+    }
+    body { transition: background .25s, color .25s; }
+    .theme-fab {
+      position: fixed; bottom: 18px; right: 18px; z-index: 9999;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1px solid var(--border); background: var(--card);
+      color: var(--text); cursor: pointer; font-size: 18px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.30); transition: all .2s;
+    }
+    .theme-fab:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+</style>
+</head>
+
+<body>
+  <button class="theme-fab" onclick="toggleTheme()" title="Schimba tema">🌙</button>
+
+
+  <header>
+    <h1>&#9654; Sesiuni Înregistrate</h1>
+    <a class="back-btn" href="/">&#8592; Dashboard</a>
+  </header>
+
+  <div class="main">
+
+    <!-- ── Session list ── -->
+    <div class="sess-list-wrap" id="sessList">
+      <div class="empty-msg">Se încarcă sesiunile…</div>
+    </div>
+
+    <!-- ── Player area ── -->
+    <div class="player-wrap" id="playerArea">
+      <div id="noSession">
+        <div style="font-size:40px;margin-bottom:10px">&#9654;</div>
+        Selectează o sesiune din stânga pentru a o reda
+      </div>
+
+      <div id="playerContent" style="display:none;height:100%;display:none;flex-direction:column;gap:12px">
+        <div class="player-top">
+
+          <!-- Video + controls -->
+          <div class="card" style="display:flex;flex-direction:column">
+            <div class="card-title">&#9654; Redare Cadre</div>
+            <canvas id="playerCanvas" width="480" height="240"></canvas>
+            <div class="player-controls">
+              <button class="ctrl-btn" id="btnPlay" onclick="togglePlay()">&#9654; Play</button>
+              <button class="ctrl-btn" onclick="stepFrame(-1)">&#9664;</button>
+              <button class="ctrl-btn" onclick="stepFrame(1)">&#9654;&#9654;</button>
+              <input type="range" id="seekBar" min="0" value="0" oninput="seekTo(+this.value)">
+              <span id="frameCounter">0 / 0</span>
+              <select class="speed-select" id="speedSelect" onchange="setPlaySpeed(+this.value)">
+                <option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option>
+                <option value="2">2×</option>
+                <option value="4">4×</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Live telemetry for current frame -->
+          <div class="card">
+            <div class="card-title">&#9632; Telemetrie Cadru</div>
+            <div class="tele-grid">
+              <div class="tele-box">
+                <div class="tele-val" id="tSpeed">0.00</div>
+                <div class="tele-lbl">Viteză</div>
+              </div>
+              <div class="tele-box">
+                <div class="tele-val" id="tTurn">0.00</div>
+                <div class="tele-lbl">Viraj</div>
+              </div>
+            </div>
+            <div class="chart-wrap"><canvas id="teleChart"></canvas></div>
+          </div>
+
+        </div>
+
+        <!-- Session stats -->
+        <div class="card">
+          <div class="card-title">&#9632; Statistici Sesiune — <span id="sessStatName"
+              style="color:var(--accent)"></span></div>
+          <div class="stats-grid">
+            <div class="stat-row">
+              <div class="stat-key">Total cadre</div>
+              <div class="stat-val" id="statFrames">—</div>
+            </div>
+            <div class="stat-row">
+              <div class="stat-key">Durată</div>
+              <div class="stat-val" id="statDur">—</div>
+            </div>
+            <div class="stat-row">
+              <div class="stat-key">Viteză medie</div>
+              <div class="stat-val" id="statSpeed">—</div>
+            </div>
+            <div class="stat-row">
+              <div class="stat-key">Viraj mediu</div>
+              <div class="stat-val" id="statTurn">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ══════════════════════════════════════════════════════════════════
+    // Session list
+    // ══════════════════════════════════════════════════════════════════
+    let allSessions = [];
+    let currentSession = null;
+    let frameData = [];
+    let currentIdx = 0;
+    let playing = false;
+    let playTimer = null;
+    let playFps = 10;
+
+    async function loadSessionList() {
+      const resp = await fetch('/sessions/list');
+      allSessions = await resp.json();
+      renderSessionList();
+    }
+
+    function renderSessionList() {
+      const el = document.getElementById('sessList');
+      if (!allSessions.length) {
+        el.innerHTML = '<div class="empty-msg">Nicio sesiune înregistrată</div>';
+        return;
+      }
+      el.innerHTML = allSessions.map(s => {
+        const dur = formatDur(s.duration_s);
+        return `<div class="sess-card" id="sc_${s.session}" onclick="loadSession('${s.session}')">
+      <div class="sess-name">${s.session}</div>
+      <div class="sess-meta">
+        <span>Cadre: <strong>${s.frames}</strong></span>
+        <span>Durată: <strong>${dur}</strong></span>
+        <span>Vit. med.: <strong>${s.avg_speed.toFixed(2)}</strong></span>
+        <span>Viraj med.: <strong>${s.avg_turn.toFixed(2)}</strong></span>
+      </div>
+      <div class="sess-actions">
+        <button class="del-btn" onclick="exportSession(event,'${s.session}')" style="border-color:#4f8ef7;color:#4f8ef7" title="Exportă ca MP4">&#9660; Export MP4</button>
+        <button class="del-btn" onclick="deleteSession(event,'${s.session}')">&#10005; Șterge</button>
+      </div>
+      <div id="expProgress_${s.session}" style="display:none;margin-top:6px;font-size:11px;color:#4f8ef7"></div>
+    </div>`;
+      }).join('');
+    }
+
+    async function deleteSession(e, id) {
+      e.stopPropagation();
+      if (!confirm(`Șterge sesiunea "${id}"?`)) return;
+      await fetch(`/sessions/${id}/delete`, { method: 'POST' });
+      if (currentSession === id) {
+        currentSession = null;
+        stopPlay();
+        document.getElementById('noSession').style.display = 'block';
+        document.getElementById('playerContent').style.display = 'none';
+      }
+      loadSessionList();
+    }
+
+    function formatDur(s) {
+      if (!s) return '—';
+      const m = Math.floor(s / 60), sec = Math.round(s % 60);
+      return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Load & play session
+    // ══════════════════════════════════════════════════════════════════
+    async function loadSession(id) {
+      stopPlay();
+      // Highlight
+      document.querySelectorAll('.sess-card').forEach(c => c.classList.remove('active'));
+      const card = document.getElementById('sc_' + id);
+      if (card) card.classList.add('active');
+
+      currentSession = id;
+      document.getElementById('noSession').style.display = 'none';
+      const pc = document.getElementById('playerContent');
+      pc.style.display = 'flex';
+
+      const resp = await fetch(`/sessions/${id}`);
+      const data = await resp.json();
+      frameData = data.frames || [];
+      currentIdx = 0;
+
+      // Seek bar
+      const seek = document.getElementById('seekBar');
+      seek.max = Math.max(0, frameData.length - 1);
+      seek.value = 0;
+      document.getElementById('frameCounter').textContent = `0 / ${frameData.length}`;
+
+      // Stats
+      document.getElementById('sessStatName').textContent = id;
+      document.getElementById('statFrames').textContent = frameData.length;
+
+      const meta = allSessions.find(s => s.session === id);
+      if (meta) {
+        document.getElementById('statDur').textContent = formatDur(meta.duration_s);
+        document.getElementById('statSpeed').textContent = meta.avg_speed.toFixed(3);
+        document.getElementById('statTurn').textContent = meta.avg_turn.toFixed(3);
+      }
+
+      buildTeleChart();
+      renderFrame(0);
+    }
+
+    function renderFrame(idx) {
+      if (!frameData.length) return;
+      idx = Math.max(0, Math.min(idx, frameData.length - 1));
+      currentIdx = idx;
+
+      const fd = frameData[idx];
+      document.getElementById('seekBar').value = idx;
+      document.getElementById('frameCounter').textContent = `${idx + 1} / ${frameData.length}`;
+      document.getElementById('tSpeed').textContent = fd.speed.toFixed(3);
+      document.getElementById('tTurn').textContent = fd.turn.toFixed(3);
+
+      // Draw frame on canvas
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.getElementById('playerCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.naturalWidth || 480;
+        canvas.height = img.naturalHeight || 240;
+        ctx.drawImage(img, 0, 0);
+
+        // Overlay
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(0, 0, 200, 54);
+        ctx.fillStyle = '#4f8ef7';
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText(`SPD: ${fd.speed.toFixed(3)}`, 8, 20);
+        ctx.fillStyle = '#2dce89';
+        ctx.fillText(`TRN: ${fd.turn.toFixed(3)}`, 8, 40);
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '11px monospace';
+        ctx.fillText(`[${idx + 1}/${frameData.length}]`, 8, 55);
+      };
+      img.src = `/sessions/${currentSession}/frame/${idx}?t=${Date.now()}`;
+
+      // Update tele chart marker
+      updateTeleChartMarker(idx);
+    }
+
+    function seekTo(idx) { stopPlay(); renderFrame(idx); }
+    function stepFrame(delta) { stopPlay(); renderFrame(currentIdx + delta); }
+
+    function togglePlay() {
+      playing ? stopPlay() : startPlay();
+    }
+
+    function startPlay() {
+      playing = true;
+      document.getElementById('btnPlay').textContent = '⏸ Pause';
+      document.getElementById('btnPlay').classList.add('active');
+      const interval = 1000 / playFps;
+      playTimer = setInterval(() => {
+        if (currentIdx >= frameData.length - 1) { stopPlay(); return; }
+        renderFrame(currentIdx + 1);
+      }, interval);
+    }
+
+    function stopPlay() {
+      playing = false;
+      clearInterval(playTimer);
+      const btn = document.getElementById('btnPlay');
+      if (btn) { btn.textContent = '▶ Play'; btn.classList.remove('active'); }
+    }
+
+    function setPlaySpeed(mult) {
+      playFps = 10 * mult;
+      if (playing) { stopPlay(); startPlay(); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Telemetry chart (full session overview)
+    // ══════════════════════════════════════════════════════════════════
+    let teleChart = null;
+
+    function buildTeleChart() {
+      if (teleChart) teleChart.destroy();
+      const labels = frameData.map((_, i) => i);
+      const speeds = frameData.map(f => f.speed);
+      const turns = frameData.map(f => f.turn);
+      const ctx = document.getElementById('teleChart').getContext('2d');
+      teleChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Viteză', data: speeds, borderColor: '#4f8ef7', backgroundColor: '#4f8ef722',
+              borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.2
+            },
+            {
+              label: 'Viraj', data: turns, borderColor: '#2dce89', backgroundColor: '#2dce8922',
+              borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.2
+            },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          plugins: {
+            legend: { labels: { color: '#6b7299', font: { size: 10 } } },
+            annotation: {}
+          },
+          scales: {
+            x: { display: false },
+            y: {
+              min: -1.1, max: 1.1, grid: { color: '#2a2d38' },
+              ticks: { color: '#6b7299', font: { size: 9 }, stepSize: 0.5 }
+            }
+          }
+        }
+      });
+    }
+
+    function updateTeleChartMarker(idx) {
+      if (!teleChart || !frameData.length) return;
+      // Highlight current frame as a vertical line via dataset
+      const lineData = frameData.map((_, i) => i === idx ? 1.1 : null);
+      if (teleChart.data.datasets.length < 3) {
+        teleChart.data.datasets.push({
+          label: 'Cadru curent', data: lineData,
+          borderColor: '#f7c948', borderWidth: 1, pointRadius: 0,
+          fill: false, spanGaps: false, tension: 0,
+        });
+      } else {
+        teleChart.data.datasets[2].data = lineData;
+      }
+      teleChart.update('none');
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Video Export (MP4)
+    // ══════════════════════════════════════════════════════════════════
+    const exportPollers = {};
+
+    async function exportSession(e, id) {
+      e.stopPropagation();
+      const progEl = document.getElementById('expProgress_' + id);
+      if (!progEl) return;
+
+      progEl.style.display = 'block';
+      progEl.textContent = 'Se pornește exportul…';
+
+      const resp = await fetch(`/sessions/${id}/export`, { method: 'POST' });
+      const data = await resp.json();
+
+      if (!data.ok) {
+        progEl.textContent = '⚠ ' + (data.error || 'Eroare export');
+        progEl.style.color = '#f75d5d';
+        return;
+      }
+
+      progEl.style.color = '#4f8ef7';
+      // Poll for status every 2 seconds
+      if (exportPollers[id]) clearInterval(exportPollers[id]);
+      exportPollers[id] = setInterval(async () => {
+        const sr = await fetch(`/sessions/${id}/export/status`);
+        const sd = await sr.json();
+
+        if (sd.status === 'running') {
+          progEl.textContent = `⏳ Export în curs… ${sd.progress || 0}%`;
+        } else if (sd.status === 'done') {
+          clearInterval(exportPollers[id]);
+          progEl.innerHTML = `✓ Export complet!
+            <a href="/sessions/${id}/export/download"
+               style="color:#2dce89;font-weight:700;margin-left:8px"
+               download>&#9660; Descarcă MP4</a>`;
+          progEl.style.color = '#2dce89';
+        } else if (sd.status === 'error') {
+          clearInterval(exportPollers[id]);
+          progEl.textContent = '⚠ Eroare: ' + (sd.error || '?');
+          progEl.style.color = '#f75d5d';
+        }
+      }, 2000);
+    }
+
+    // ── Init ──
+    loadSessionList();
+  </script>
+  <script>
+    (function () {
+      const KEY = 'rover-theme';
+      window.applyTheme = function (t) {
+        const light = t === 'light';
+        document.body.classList.toggle('light', light);
+        const b = document.querySelector('.theme-fab');
+        if (b) b.textContent = light ? '🌞' : '🌙';
+      };
+      window.toggleTheme = function () {
+        const cur = document.body.classList.contains('light') ? 'light' : 'dark';
+        const next = cur === 'light' ? 'dark' : 'light';
+        localStorage.setItem(KEY, next);
+        applyTheme(next);
+      };
+      applyTheme(localStorage.getItem(KEY) || 'dark');
+    })();
+  </script>
+</body>
+
+</html>

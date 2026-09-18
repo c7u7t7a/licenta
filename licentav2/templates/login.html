@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Autonomous Car</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #07090f;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Animated background blobs ── */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.18;
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+    .blob-1 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, #3b82f6, transparent 70%);
+      top: -120px; left: -100px;
+      animation-duration: 14s;
+    }
+    .blob-2 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, #8b5cf6, transparent 70%);
+      bottom: -100px; right: -80px;
+      animation-duration: 10s;
+      animation-delay: -4s;
+    }
+    .blob-3 {
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, #06b6d4, transparent 70%);
+      top: 50%; left: 55%;
+      animation-duration: 18s;
+      animation-delay: -8s;
+    }
+    @keyframes drift {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(30px, 20px) scale(1.08); }
+    }
+
+    /* ── Card ── */
+    .card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 400px;
+      margin: 20px;
+      padding: 40px 36px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 20px;
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.04) inset,
+        0 24px 64px rgba(0, 0, 0, 0.5);
+      animation: slideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Logo ── */
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .logo-icon {
+      width: 52px; height: 52px;
+      margin: 0 auto 14px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35);
+    }
+    .logo-icon svg { width: 26px; height: 26px; fill: white; }
+    .logo h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #f0f6ff;
+      letter-spacing: -0.01em;
+    }
+    .logo p {
+      font-size: 0.82rem;
+      color: #6b7280;
+      margin-top: 5px;
+    }
+
+    /* ── Error banner ── */
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid rgba(248, 81, 73, 0.3);
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 0.83rem;
+      color: #f87171;
+      margin-bottom: 22px;
+      animation: shake 0.35s ease;
+    }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25%      { transform: translateX(-6px); }
+      75%      { transform: translateX(6px); }
+    }
+    .error-banner svg { flex-shrink: 0; width: 16px; height: 16px; fill: #f87171; }
+
+    /* ── Fields ── */
+    .field { margin-bottom: 18px; }
+    label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #9ca3af;
+      margin-bottom: 7px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .input-wrap {
+      position: relative;
+    }
+    .input-wrap svg {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px; height: 16px;
+      fill: #4b5563;
+      pointer-events: none;
+      transition: fill 0.2s;
+    }
+    input[type=text],
+    input[type=password] {
+      width: 100%;
+      padding: 11px 12px 11px 38px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: #f0f6ff;
+      font-size: 0.93rem;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    }
+    input[type=text]::placeholder,
+    input[type=password]::placeholder { color: #374151; }
+    input[type=text]:focus,
+    input[type=password]:focus {
+      border-color: rgba(99, 102, 241, 0.7);
+      background: rgba(99, 102, 241, 0.06);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+    .input-wrap:focus-within svg { fill: #6366f1; }
+
+    /* ── Remember me ── */
+    .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .remember-row input[type=checkbox] { display: none; }
+    .checkbox-box {
+      width: 18px; height: 18px;
+      border: 1.5px solid rgba(255,255,255,0.15);
+      border-radius: 5px;
+      background: rgba(255,255,255,0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.18s;
+    }
+    .checkbox-box svg {
+      width: 10px; height: 10px;
+      fill: none;
+      stroke: white;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0;
+      transform: scale(0.5);
+      transition: all 0.18s;
+    }
+    .remember-row input:checked ~ .checkbox-box {
+      background: #6366f1;
+      border-color: #6366f1;
+      box-shadow: 0 0 10px rgba(99,102,241,0.4);
+    }
+    .remember-row input:checked ~ .checkbox-box svg {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .remember-label {
+      font-size: 0.84rem;
+      color: #9ca3af;
+    }
+
+    /* ── Submit button ── */
+    .btn-submit {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: white;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.35);
+      transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-submit::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.12), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .btn-submit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(99, 102, 241, 0.5);
+      filter: brightness(1.08);
+    }
+    .btn-submit:hover::after { opacity: 1; }
+    .btn-submit:active { transform: translateY(0); }
+
+    input[type=hidden] { display: none; }
+
+    /* ── Light mode (shared cu restul site-ului, cheia 'rover-theme') ── */
+    body { transition: background .25s; }
+    body.light { background: #eceff5; }
+    body.light .blob { opacity: 0.10; }
+    body.light .card {
+      background: rgba(255,255,255,0.92);
+      border-color: rgba(15,23,42,0.12);
+      box-shadow: 0 0 0 1px rgba(15,23,42,0.04) inset, 0 24px 64px rgba(15,23,42,0.18);
+    }
+    body.light .logo h1 { color: #0b1220; }
+    body.light .logo p { color: #475569; }
+    body.light label { color: #334155; }
+    body.light .input-wrap svg { fill: #94a3b8; }
+    body.light input[type=text],
+    body.light input[type=password] {
+      background: #f1f4fa; border-color: rgba(15,23,42,0.16); color: #0b1220;
+    }
+    body.light input[type=text]::placeholder,
+    body.light input[type=password]::placeholder { color: #94a3b8; }
+    body.light .remember-label { color: #334155; }
+    body.light .checkbox-box { border-color: rgba(15,23,42,0.25); background: #f1f4fa; }
+    .theme-fab {
+      position: fixed; bottom: 18px; right: 18px; z-index: 9999;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06);
+      color: #e2e8ff; cursor: pointer; font-size: 18px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(12px); transition: all .2s;
+    }
+    .theme-fab:hover { border-color: #6366f1; transform: translateY(-2px); }
+    body.light .theme-fab { background: #fff; border-color: rgba(15,23,42,0.15); color: #1e293b; }
+  </style>
+</head>
+<body>
+
+  <button class="theme-fab" onclick="toggleTheme()" title="Schimba tema">&#127769;</button>
+
+  <div class="bg">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <div class="card">
+
+    <div class="logo">
+      <div class="logo-icon">
+        <!-- Car icon -->
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 11l1.5-4.5h11L19 11M3 11h18v6H3v-6zM7 17v1a1 1 0 002 0v-1m6 0v1a1 1 0 002 0v-1M6 14h.01M18 14h.01"/>
+        </svg>
+      </div>
+      <h1>Autonomous Car</h1>
+      <p>Sign in to access the control panel</p>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="error-banner">
+          <svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+          {{ messages[0] }}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" autocomplete="on">
+      <input type="hidden" name="next" value="{{ next_url }}">
+
+      <div class="field">
+        <label for="username">Username</label>
+        <div class="input-wrap">
+          <svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+          <input type="text" id="username" name="username"
+                 placeholder="Enter username" autocomplete="username" autofocus>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="input-wrap">
+          <svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+          <input type="password" id="password" name="password"
+                 placeholder="Enter password" autocomplete="current-password">
+        </div>
+      </div>
+
+      <label class="remember-row">
+        <input type="checkbox" name="remember" id="remember">
+        <span class="checkbox-box">
+          <svg viewBox="0 0 12 12">
+            <polyline points="2,6 5,9 10,3"/>
+          </svg>
+        </span>
+        <span class="remember-label">Keep me signed in for 30 days</span>
+      </label>
+
+      <button type="submit" class="btn-submit">Sign in</button>
+    </form>
+
+  </div>
+
+  <script>
+    (function () {
+      const KEY = 'rover-theme';
+      window.applyTheme = function (t) {
+        const light = t === 'light';
+        document.body.classList.toggle('light', light);
+        const b = document.querySelector('.theme-fab');
+        if (b) b.textContent = light ? '\u{1F31E}' : '\u{1F319}';
+      };
+      window.toggleTheme = function () {
+        const cur = document.body.classList.contains('light') ? 'light' : 'dark';
+        const next = cur === 'light' ? 'dark' : 'light';
+        localStorage.setItem(KEY, next);
+        applyTheme(next);
+      };
+      applyTheme(localStorage.getItem(KEY) || 'dark');
+    })();
+  </script>
+</body>
+</html>
